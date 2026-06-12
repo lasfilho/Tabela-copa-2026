@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: copa2026-db
+    environment:
+      POSTGRES_USER: copa
+      POSTGRES_PASSWORD: copa2026
+      POSTGRES_DB: copa2026
+    volumes:
+      - copa_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copa -d copa2026"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: copa2026-app
+    environment:
+      DATABASE_URL: postgres://copa:copa2026@db:5432/copa2026
+      PORT: 8080
+      SYNC_ENABLED: "true"
+      SPORTS_API_KEY: "123"
+      SYNC_INTERVAL_MS: "300000"
+    ports:
+      - "3000:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  copa_pgdata:

@@ -1,0 +1,353 @@
+{
+  "tournament": {
+    "name": "Copa do Mundo FIFA 2026",
+    "hosts": [
+      "Canadá",
+      "México",
+      "Estados Unidos"
+    ],
+    "start": "2026-06-11",
+    "end": "2026-07-19",
+    "totalTeams": 48,
+    "totalMatches": 104,
+    "currentPhase": "group"
+  },
+  "teams": [
+    {
+      "id": "MEX",
+      "name": "México",
+      "flag": "mx",
+      "group": "A",
+      "confederation": "CONCACAF"
+    },
+    {
+      "id": "RSA",
+      "name": "África do Sul",
+      "flag": "za",
+      "group": "A",
+      "confederation": "CAF"
+    },
+    {
+      "id": "KOR",
+      "name": "Coreia do Sul",
+      "flag": "kr",
+      "group": "A",
+      "confederation": "AFC"
+    },
+    {
+      "id": "CZE",
+      "name": "Tchéquia",
+      "flag": "cz",
+      "group": "A",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "CAN",
+      "name": "Canadá",
+      "flag": "ca",
+      "group": "B",
+      "confederation": "CONCACAF"
+    },
+    {
+      "id": "BIH",
+      "name": "Bósnia e Herzegovina",
+      "flag": "ba",
+      "group": "B",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "QAT",
+      "name": "Catar",
+      "flag": "qa",
+      "group": "B",
+      "confederation": "AFC"
+    },
+    {
+      "id": "SUI",
+      "name": "Suíça",
+      "flag": "ch",
+      "group": "B",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "BRA",
+      "name": "Brasil",
+      "flag": "br",
+      "group": "C",
+      "confederation": "CONMEBOL"
+    },
+    {
+      "id": "MAR",
+      "name": "Marrocos",
+      "flag": "ma",
+      "group": "C",
+      "confederation": "CAF"
+    },
+    {
+      "id": "HAI",
+      "name": "Haiti",
+      "flag": "ht",
+      "group": "C",
+      "confederation": "CONCACAF"
+    },
+    {
+      "id": "SCO",
+      "name": "Escócia",
+      "flag": "gb-sct",
+      "group": "C",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "USA",
+      "name": "Estados Unidos",
+      "flag": "us",
+      "group": "D",
+      "confederation": "CONCACAF"
+    },
+    {
+      "id": "PAR",
+      "name": "Paraguai",
+      "flag": "py",
+      "group": "D",
+      "confederation": "CONMEBOL"
+    },
+    {
+      "id": "AUS",
+      "name": "Austrália",
+      "flag": "au",
+      "group": "D",
+      "confederation": "AFC"
+    },
+    {
+      "id": "TUR",
+      "name": "Turquia",
+      "flag": "tr",
+      "group": "D",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "GER",
+      "name": "Alemanha",
+      "flag": "de",
+      "group": "E",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "CUW",
+      "name": "Curaçao",
+      "flag": "cw",
+      "group": "E",
+      "confederation": "CONCACAF"
+    },
+    {
+      "id": "CIV",
+      "name": "Costa do Marfim",
+      "flag": "ci",
+      "group": "E",
+      "confederation": "CAF"
+    },
+    {
+      "id": "ECU",
+      "name": "Equador",
+      "flag": "ec",
+      "group": "E",
+      "confederation": "CONMEBOL"
+    },
+    {
+      "id": "NED",
+      "name": "Holanda",
+      "flag": "nl",
+      "group": "F",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "JPN",
+      "name": "Japão",
+      "flag": "jp",
+      "group": "F",
+      "confederation": "AFC"
+    },
+    {
+      "id": "SWE",
+      "name": "Suécia",
+      "flag": "se",
+      "group": "F",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "TUN",
+      "name": "Tunísia",
+      "flag": "tn",
+      "group": "F",
+      "confederation": "CAF"
+    },
+    {
+      "id": "BEL",
+      "name": "Bélgica",
+      "flag": "be",
+      "group": "G",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "EGY",
+      "name": "Egito",
+      "flag": "eg",
+      "group": "G",
+      "confederation": "CAF"
+    },
+    {
+      "id": "IRN",
+      "name": "Irã",
+      "flag": "ir",
+      "group": "G",
+      "confederation": "AFC"
+    },
+    {
+      "id": "NZL",
+      "name": "Nova Zelândia",
+      "flag": "nz",
+      "group": "G",
+      "confederation": "OFC"
+    },
+    {
+      "id": "ESP",
+      "name": "Espanha",
+      "flag": "es",
+      "group": "H",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "CPV",
+      "name": "Cabo Verde",
+      "flag": "cv",
+      "group": "H",
+      "confederation": "CAF"
+    },
+    {
+      "id": "KSA",
+      "name": "Arábia Saudita",
+      "flag": "sa",
+      "group": "H",
+      "confederation": "AFC"
+    },
+    {
+      "id": "URU",
+      "name": "Uruguai",
+      "flag": "uy",
+      "group": "H",
+      "confederation": "CONMEBOL"
+    },
+    {
+      "id": "FRA",
+      "name": "França",
+      "flag": "fr",
+      "group": "I",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "SEN",
+      "name": "Senegal",
+      "flag": "sn",
+      "group": "I",
+      "confederation": "CAF"
+    },
+    {
+      "id": "IRQ",
+      "name": "Iraque",
+      "flag": "iq",
+      "group": "I",
+      "confederation": "AFC"
+    },
+    {
+      "id": "NOR",
+      "name": "Noruega",
+      "flag": "no",
+      "group": "I",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "ARG",
+      "name": "Argentina",
+      "flag": "ar",
+      "group": "J",
+      "confederation": "CONMEBOL"
+    },
+    {
+      "id": "ALG",
+      "name": "Argélia",
+      "flag": "dz",
+      "group": "J",
+      "confederation": "CAF"
+    },
+    {
+      "id": "AUT",
+      "name": "Áustria",
+      "flag": "at",
+      "group": "J",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "JOR",
+      "name": "Jordânia",
+      "flag": "jo",
+      "group": "J",
+      "confederation": "AFC"
+    },
+    {
+      "id": "POR",
+      "name": "Portugal",
+      "flag": "pt",
+      "group": "K",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "COD",
+      "name": "RD Congo",
+      "flag": "cd",
+      "group": "K",
+      "confederation": "CAF"
+    },
+    {
+      "id": "UZB",
+      "name": "Uzbequistão",
+      "flag": "uz",
+      "group": "K",
+      "confederation": "AFC"
+    },
+    {
+      "id": "COL",
+      "name": "Colômbia",
+      "flag": "co",
+      "group": "K",
+      "confederation": "CONMEBOL"
+    },
+    {
+      "id": "ENG",
+      "name": "Inglaterra",
+      "flag": "gb-eng",
+      "group": "L",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "CRO",
+      "name": "Croácia",
+      "flag": "hr",
+      "group": "L",
+      "confederation": "UEFA"
+    },
+    {
+      "id": "GHA",
+      "name": "Gana",
+      "flag": "gh",
+      "group": "L",
+      "confederation": "CAF"
+    },
+    {
+      "id": "PAN",
+      "name": "Panamá",
+      "flag": "pa",
+      "group": "L",
+      "confederation": "CONCACAF"
+    }
+  ]
+}

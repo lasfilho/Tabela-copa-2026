@@ -1,0 +1,44 @@
+{
+  "topScorers": [
+    {
+      "player": "Kylian Mbappé",
+      "team": "FRA",
+      "goals": 3,
+      "assists": 1
+    },
+    {
+      "player": "Erling Haaland",
+      "team": "NOR",
+      "goals": 3,
+      "assists": 0
+    },
+    {
+      "player": "Lionel Messi",
+      "team": "ARG",
+      "goals": 2,
+      "assists": 2
+    },
+    {
+      "player": "Vinícius Júnior",
+      "team": "BRA",
+      "goals": 2,
+      "assists": 1
+    },
+    {
+      "player": "Harry Kane",
+      "team": "ENG",
+      "goals": 2,
+      "assists": 0
+    },
+    {
+      "player": "Lamine Yamal",
+      "team": "ESP",
+      "goals": 2,
+      "assists": 1
+    }
+  ],
+  "meta": {
+    "lastUpdated": "2026-06-11",
+    "source": "Dados de demonstração"
+  }
+}

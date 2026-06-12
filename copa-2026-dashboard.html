@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Dashboard interativo da Copa do Mundo FIFA 2026" />
+  <title>Copa 2026 — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=5" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="data/embedded.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__brand">
+        <div class="brand-mark">26</div>
+        <div class="sidebar__brand-text">
+          <strong>Copa 2026</strong>
+          <span>Dashboard local</span>
+        </div>
+      </div>
+
+      <nav class="sidebar__nav" aria-label="Navegação principal">
+        <a href="#overview" class="nav-link active" data-section="overview" title="Visão geral">
+          <span class="nav-icon">◉</span><span class="nav-label">Visão geral</span>
+        </a>
+        <a href="#groups" class="nav-link" data-section="groups" title="Grupos">
+          <span class="nav-icon">▦</span><span class="nav-label">Grupos</span>
+        </a>
+        <a href="#matches" class="nav-link" data-section="matches" title="Jogos">
+          <span class="nav-icon">⚽</span><span class="nav-label">Jogos</span>
+        </a>
+        <a href="#knockout" class="nav-link" data-section="knockout" title="Mata-mata">
+          <span class="nav-icon">⬡</span><span class="nav-label">Mata-mata</span>
+        </a>
+        <a href="#teams" class="nav-link" data-section="teams" title="Seleções">
+          <span class="nav-icon">🏳</span><span class="nav-label">Seleções</span>
+        </a>
+        <a href="#stats" class="nav-link" data-section="stats" title="Estatísticas">
+          <span class="nav-icon">📊</span><span class="nav-label">Estatísticas</span>
+        </a>
+        <a href="#calendar" class="nav-link" data-section="calendar" title="Calendário">
+          <span class="nav-icon">📅</span><span class="nav-label">Calendário</span>
+        </a>
+      </nav>
+
+      <div class="sidebar__footer">
+        <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" aria-label="Retrair menu" aria-expanded="true">
+          <span class="sidebar-collapse-btn__icon" aria-hidden="true">◀</span>
+          <span class="nav-label">Retrair menu</span>
+        </button>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Alternar tema">
+          <span class="theme-toggle__icon">☀</span>
+          <span class="theme-toggle__label">Modo claro / escuro</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="main-wrap">
+      <header class="topbar">
+        <button type="button" class="menu-btn" id="menu-btn" aria-label="Retrair menu" title="Retrair menu">☰</button>
+        <div class="topbar__search">
+          <input type="search" id="global-search" placeholder="Buscar seleção, grupo ou jogo..." autocomplete="off" />
+        </div>
+        <div class="topbar__actions">
+          <div class="mode-switch" id="mode-switch" role="group" aria-label="Modo de acompanhamento">
+            <button type="button" class="mode-btn active" data-mode="real">Real</button>
+            <button type="button" class="mode-btn" data-mode="simulation">Simulação</button>
+          </div>
+          <div class="phase-badge" id="phase-badge">Fase de grupos</div>
+          <button type="button" class="btn btn--ghost sync-toggle" id="sync-toggle" title="Placares automáticos via TheSportsDB (grátis)">
+            <span class="sync-toggle__dot" aria-hidden="true"></span>
+            <span id="sync-toggle-label">Sync off</span>
+          </button>
+          <button type="button" class="btn btn--ghost" id="reset-scores-btn" title="Limpar placares do modo atual">Limpar placares</button>
+          <button type="button" class="btn btn--ghost" id="export-btn">Exportar</button>
+        </div>
+      </header>
+
+      <!-- KPI strip -->
+      <div class="mode-banner mode-banner--real" id="mode-banner">Modo Real — placares salvos separadamente da simulação</div>
+      <div class="sync-banner sync-banner--off" id="sync-banner" hidden>
+        <span id="sync-banner-text">Sync automático desligado</span>
+        <button type="button" class="btn btn--ghost btn--sm" id="sync-run-btn" title="Buscar placares agora">Sincronizar agora</button>
+      </div>
+      <section class="kpi-strip" id="kpi-strip" aria-label="Indicadores do torneio"></section>
+
+      <main class="content" id="content">
+        <!-- OVERVIEW -->
+        <section class="view active" id="view-overview" data-view="overview">
+          <div class="view-header">
+            <div>
+              <h1>Visão geral</h1>
+            <p class="view-subtitle" id="mode-subtitle">Modo Real — registre os placares oficiais conforme os jogos terminam</p>
+            </div>
+            <div class="countdown" id="next-countdown"></div>
+          </div>
+
+          <div class="grid grid--2">
+            <article class="card card--accent" id="next-matches-card">
+              <div class="card__header"><h2>Próximos jogos</h2></div>
+              <div class="card__body" id="next-matches"></div>
+            </article>
+            <article class="card">
+              <div class="card__header"><h2>Últimos resultados</h2></div>
+              <div class="card__body" id="recent-results"></div>
+            </article>
+          </div>
+
+          <div class="grid grid--2">
+            <article class="card">
+              <div class="card__header"><h2>Destaques estatísticos</h2></div>
+              <div class="card__body" id="highlights"></div>
+            </article>
+            <article class="card">
+              <div class="card__header"><h2>Artilheiros</h2></div>
+              <div class="card__body" id="top-scorers-mini"></div>
+            </article>
+          </div>
+
+          <article class="card collapsible open">
+            <button type="button" class="card__header card__toggle" data-collapse="overview-groups">
+              <h2>Classificação rápida por grupo</h2><span class="chevron">▾</span>
+            </button>
+            <div class="card__body" id="overview-groups" data-collapse-body></div>
+          </article>
+        </section>
+
+        <!-- GROUPS -->
+        <section class="view" id="view-groups" data-view="groups" hidden>
+          <div class="view-header">
+            <h1>Grupos</h1>
+            <p class="view-subtitle">Clique no grupo para expandir · edite placares · classificação atualiza na hora</p>
+          </div>
+          <div class="filters-bar" id="groups-filters"></div>
+          <div class="groups-grid" id="groups-grid"></div>
+        </section>
+
+        <!-- MATCHES -->
+        <section class="view" id="view-matches" data-view="matches" hidden>
+          <div class="view-header">
+            <h1>Jogos</h1>
+            <p class="view-subtitle">Edite placares diretamente na tabela · mata-mata preenche automaticamente</p>
+          </div>
+          <div class="filters-bar" id="matches-filters"></div>
+          <div id="matches-table-wrap"></div>
+        </section>
+
+        <!-- KNOCKOUT -->
+        <section class="view" id="view-knockout" data-view="knockout" hidden>
+          <div class="view-header">
+            <h1>Mata-mata</h1>
+            <p class="view-subtitle">Oitavas (32) até a final em Nova Jersey</p>
+          </div>
+          <div class="bracket-wrap" id="bracket-wrap"></div>
+        </section>
+
+        <!-- TEAMS -->
+        <section class="view" id="view-teams" data-view="teams" hidden>
+          <div class="view-header">
+            <h1>Seleções</h1>
+            <p class="view-subtitle">48 seleções · clique para detalhes · compare duas equipes</p>
+          </div>
+          <div class="compare-bar" id="compare-bar">
+            <select id="compare-a"><option value="">Comparar A...</option></select>
+            <span>vs</span>
+            <select id="compare-b"><option value="">Comparar B...</option></select>
+            <button type="button" class="btn btn--primary" id="compare-btn">Comparar</button>
+          </div>
+          <div id="compare-result" class="compare-result"></div>
+          <div class="teams-grid" id="teams-grid"></div>
+        </section>
+
+        <!-- STATS -->
+        <section class="view" id="view-stats" data-view="stats" hidden>
+          <div class="view-header">
+            <h1>Estatísticas</h1>
+            <p class="view-subtitle">Tendências e comparativos do torneio</p>
+          </div>
+          <div class="charts-grid" id="charts-grid">
+            <article class="card"><div class="card__header"><h2>Gols por fase</h2></div><div class="card__body chart-wrap"><canvas id="chart-goals-phase"></canvas></div></article>
+            <article class="card"><div class="card__header"><h2>Distribuição de resultados</h2></div><div class="card__body chart-wrap"><canvas id="chart-results"></canvas></div></article>
+            <article class="card"><div class="card__header"><h2>Melhor ataque</h2></div><div class="card__body chart-wrap"><canvas id="chart-attack"></canvas></div></article>
+            <article class="card"><div class="card__header"><h2>Melhor defesa</h2></div><div class="card__body chart-wrap"><canvas id="chart-defense"></canvas></div></article>
+            <article class="card card--wide"><div class="card__header"><h2>Comparativo entre grupos</h2></div><div class="card__body chart-wrap"><canvas id="chart-groups"></canvas></div></article>
+            <article class="card card--wide"><div class="card__header"><h2>Ranking por desempenho</h2></div><div class="card__body" id="performance-ranking"></div></article>
+          </div>
+        </section>
+
+        <!-- CALENDAR -->
+        <section class="view" id="view-calendar" data-view="calendar" hidden>
+          <div class="view-header">
+            <h1>Calendário</h1>
+            <p class="view-subtitle">Todos os jogos em ordem cronológica</p>
+          </div>
+          <div id="calendar-view"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal de edição de placar -->
+  <dialog class="modal" id="score-modal">
+    <div class="modal__header">
+      <h2 id="score-modal-title">Registrar placar</h2>
+      <button type="button" class="modal__close" id="score-modal-close" aria-label="Fechar">×</button>
+    </div>
+    <div class="modal__body" id="score-modal-body"></div>
+  </dialog>
+
+  <!-- Team detail modal -->
+  <dialog class="modal" id="team-modal">
+    <div class="modal__header">
+      <h2 id="modal-team-name">Seleção</h2>
+      <button type="button" class="modal__close" id="modal-close" aria-label="Fechar">×</button>
+    </div>
+    <div class="modal__body" id="modal-team-body"></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js?v=5"></script>
+</body>
+</html>
