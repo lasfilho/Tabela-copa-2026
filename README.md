@@ -22,6 +22,19 @@ Para parar: `Ctrl+C` e depois `docker compose down`
 
 Para apagar os dados do banco: `docker compose down -v`
 
+## Publicar na web (grátis)
+
+Guia completo: **[docs/planejamento-publicacao-web-gratuita.md](docs/planejamento-publicacao-web-gratuita.md)**
+
+Resumo rápido:
+
+1. Banco: [Neon](https://neon.tech) → copie `DATABASE_URL` com `?sslmode=require`
+2. App: [Render](https://render.com) → **New → Blueprint** (usa `render.yaml` na raiz)
+3. Preencha `DATABASE_URL`, `ADMIN_EMAIL` e `ADMIN_PASSWORD` fortes
+4. Acesse `https://copa-2026-xxxx.onrender.com`
+
+Variáveis documentadas em [`.env.example`](.env.example).
+
 ## Arquitetura
 
 ```

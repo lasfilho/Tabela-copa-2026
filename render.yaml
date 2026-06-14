@@ -1,0 +1,40 @@
+# Blueprint Render — deploy gratuito (Neon + Render)
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Uso:
+#   1. Crie o banco no Neon e copie DATABASE_URL (com ?sslmode=require)
+#   2. No Render: New → Blueprint → conecte este repositório
+#   3. Preencha DATABASE_URL, ADMIN_EMAIL e ADMIN_PASSWORD quando solicitado
+#   4. Deploy
+
+services:
+  - type: web
+    name: copa-2026
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8080"
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SYNC_ENABLED
+        value: "true"
+      - key: SYNC_INTERVAL_MS
+        value: "600000"
+      - key: SPORTS_API_KEY
+        value: "123"
