@@ -7,16 +7,13 @@ import {
   fetchInvitePreview, joinByToken, savePendingJoinToken,
   statusLabel, formatDate, formatDateShort, POOL_DISCLAIMER,
 } from './pool-client.js';
+import { esc, matchTeamsHTML } from './pool-match-display.js';
 
 const app = document.getElementById('public-pools-app');
 const params = new URLSearchParams(location.search);
 const slug = params.get('slug');
 const joinToken = params.get('join');
 const autoJoin = params.get('auto') === '1';
-
-function esc(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
-}
 
 async function renderList() {
   try {
@@ -87,7 +84,10 @@ async function renderDetail(poolSlug, page = 1) {
         <h3>Partidas do bolão</h3>
         <ul class="pool-matches-public">
           ${(detail.matches ?? []).map((m) =>
-            `<li>${esc(m.label || m.id)} — ${formatDateShort(m.match_date)} ${m.match_time?.slice?.(0, 5) ?? ''}</li>`
+            `<li class="pool-matches-public__item">
+              ${matchTeamsHTML(m)}
+              <span class="pool-matches-public__when">${formatDateShort(m.match_date)} ${m.match_time?.slice?.(0, 5) ?? ''}</span>
+            </li>`
           ).join('')}
         </ul>
       </section>

@@ -3194,7 +3194,22 @@ body.read-only .score-editor button {
 
 .pool-section { margin-top: 1.25rem; padding: 1rem; }
 .pool-matches-public { list-style: none; padding: 0; }
-.pool-matches-public li { padding: 0.35rem 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+.pool-matches-public li,
+.pool-matches-public__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+.pool-matches-public__when {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
 
 .nav-link--external { border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.75rem; }
 

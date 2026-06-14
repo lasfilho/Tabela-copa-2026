@@ -141,9 +141,13 @@ export async function getParticipantDetail(poolId, participantId, requesterId) {
   if (!partRows.length) throw Object.assign(new Error('Participante não encontrado'), { status: 404 });
 
   const { rows: preds } = await query(
-    `SELECT pp.*, m.label, m.match_date, m.match_time, m.home_team, m.away_team
+    `SELECT pp.*, m.label, m.match_date, m.match_time, m.home_team, m.away_team,
+            ht.name AS home_name, ht.flag AS home_flag,
+            at.name AS away_name, at.flag AS away_flag
      FROM pool_predictions pp
      JOIN matches m ON m.id = pp.match_id
+     LEFT JOIN teams ht ON ht.id = m.home_team
+     LEFT JOIN teams at ON at.id = m.away_team
      WHERE pp.participant_id = $1 ORDER BY m.match_date, m.match_time`,
     [participantId]
   );
@@ -161,6 +165,12 @@ export async function getParticipantDetail(poolId, participantId, requesterId) {
     predictions: preds.map((p) => ({
       matchId: p.match_id,
       label: p.label,
+      homeTeam: p.home_team,
+      awayTeam: p.away_team,
+      homeName: p.home_name,
+      awayName: p.away_name,
+      homeFlag: p.home_flag,
+      awayFlag: p.away_flag,
       homeScore: p.home_score,
       awayScore: p.away_score,
       pointsEarned: p.points_earned,

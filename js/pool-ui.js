@@ -7,7 +7,7 @@ import {
   createPoolInvite, fetchPoolInvites, fetchParticipantDetail, fetchMyInvites, respondToInvite,
   POOL_DISCLAIMER, statusLabel, visibilityLabel, formatDate, formatDateShort,
 } from './pool-client.js';
-import { flagUrl } from './data-service.js';
+import { esc, matchTeamsHTML } from './pool-match-display.js';
 
 const state = {
   screen: 'list',
@@ -25,32 +25,6 @@ let teamMap = {};
 let currentUser = null;
 let showToastFn = () => {};
 let poolContainer = null;
-
-function esc(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-}
-
-function resolveTeam(code, name, flag) {
-  const t = code ? teamMap[code] : null;
-  return {
-    code: code ?? '',
-    name: name ?? t?.name ?? code ?? '—',
-    flag: flagUrl({ flag: flag ?? t?.flag ?? 'un' }),
-  };
-}
-
-function matchTeamsHTML(row, compact = false) {
-  const home = resolveTeam(row.homeTeam ?? row.home_team, row.homeName ?? row.home_name, row.homeFlag ?? row.home_flag);
-  const away = resolveTeam(row.awayTeam ?? row.away_team, row.awayName ?? row.away_name, row.awayFlag ?? row.away_flag);
-  const cls = compact ? ' pool-match-teams--compact' : '';
-  const w = compact ? 18 : 24;
-  const h = compact ? 12 : 16;
-  return `<div class="pool-match-teams${cls}">
-    <span class="pool-match-team"><img src="${home.flag}" alt="" width="${w}" height="${h}" loading="lazy" /> ${esc(home.name)}</span>
-    <span class="pool-match-vs">×</span>
-    <span class="pool-match-team"><img src="${away.flag}" alt="" width="${w}" height="${h}" loading="lazy" /> ${esc(away.name)}</span>
-  </div>`;
-}
 
 function matchWhenHTML(row) {
   const date = formatDateShort(row.date ?? row.match_date);
@@ -144,7 +118,7 @@ async function openParticipantModal(participantId) {
         <table class="pool-table">
           <thead><tr><th>Jogo</th><th>Palpite</th><th>Pts</th></tr></thead>
           <tbody>${detail.predictions.map((pr) => `<tr>
-            <td>${esc(pr.label || pr.matchId)}</td>
+            <td>${matchTeamsHTML(pr, teamMap, true)}</td>
             <td>${pr.homeScore} × ${pr.awayScore}</td>
             <td>${pr.pointsEarned ?? '—'}</td>
           </tr>`).join('')}</tbody>
@@ -312,7 +286,7 @@ async function renderCreate(container) {
             <label class="pool-match-check">
               <input type="checkbox" name="matchIds" value="${m.id}" />
               <span class="pool-match-check__body">
-                ${matchTeamsHTML(m)}
+                ${matchTeamsHTML(m, teamMap)}
                 ${matchMetaHTML(m)}
               </span>
             </label>
@@ -468,7 +442,7 @@ async function renderPredictions(container) {
                  </div>`
               : `<span class="pool-pred-row__saved" title="${esc(row.editBlockedReason ?? '')}">${predText}${row.editBlockedReason ? ' 🔒' : ''}</span>`;
             return `<div class="pool-pred-row">
-              <div class="pool-pred-row__teams">${matchTeamsHTML(row, true)}</div>
+              <div class="pool-pred-row__teams">${matchTeamsHTML(row, teamMap, true)}</div>
               ${matchWhenHTML(row) || '<span class="pool-pred-row__when">—</span>'}
               <div class="pool-pred-row__palpite">${palpiteCell}</div>
               <span class="pool-pred-row__col">${actualText}</span>

@@ -24,7 +24,8 @@ Para apagar os dados do banco: `docker compose down -v`
 
 ## Publicar na web (grátis)
 
-Guia completo: **[docs/planejamento-publicacao-web-gratuita.md](docs/planejamento-publicacao-web-gratuita.md)**
+Guia completo: **[docs/planejamento-publicacao-web-gratuita.md](docs/planejamento-publicacao-web-gratuita.md)**  
+Passo a passo rápido: **[docs/deploy-passo-a-passo.md](docs/deploy-passo-a-passo.md)**
 
 Resumo rápido:
 
