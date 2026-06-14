@@ -11,6 +11,7 @@ const TSDB_ALIASES = {
   canada: 'CAN',
   'bosniaherzegovina': 'BIH',
   'bosnia herzegovina': 'BIH',
+  'bosnia and herzegovina': 'BIH',
   qatar: 'QAT',
   switzerland: 'SUI',
   brazil: 'BRA',

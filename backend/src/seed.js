@@ -5,6 +5,10 @@ import { pool, query } from './db.js';
 import {
   TOURNAMENT, TEAMS, GROUPS, ALL_MATCHES, TOP_SCORERS,
 } from './seed/schedule.js';
+import { findUserByEmail, hashPassword } from './auth.js';
+import { runPoolMigrations, seedPoolData } from './seed/pool-seed.js';
+import { hasSyncedGoals, recalculateTopScorersFromGoals } from './goal-sync.js';
+import { syncAllSquads } from './squad-sync.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -58,6 +62,41 @@ export async function seedDatabase() {
   console.log(`Seed concluído: ${TEAMS.length} times, ${ALL_MATCHES.length} jogos.`);
 }
 
+/** Atualiza artilheiros demo (upsert) — só quando ainda não há gols importados da API. */
+export async function syncTopScorers() {
+  if (await hasSyncedGoals()) {
+    await recalculateTopScorersFromGoals();
+    return;
+  }
+
+  for (const s of TOP_SCORERS) {
+    const updated = await query(
+      `UPDATE top_scorers SET goals = $3, assists = $4
+       WHERE player = $1 AND team_id = $2`,
+      [s.player, s.team, s.goals, s.assists]
+    );
+    if (updated.rowCount === 0) {
+      await query(
+        `INSERT INTO top_scorers (player, team_id, goals, assists) VALUES ($1,$2,$3,$4)`,
+        [s.player, s.team, s.goals, s.assists]
+      );
+    }
+  }
+}
+
+export async function seedAdminUser() {
+  const email = (process.env.ADMIN_EMAIL || 'admin@copa2026.local').toLowerCase();
+  const password = process.env.ADMIN_PASSWORD || 'admin123';
+  const existing = await findUserByEmail(email);
+  if (existing) return;
+
+  await query(
+    `INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, 'admin')`,
+    ['Administrador', email, await hashPassword(password)]
+  );
+  console.log(`Admin criado: ${email}`);
+}
+
 export async function initDatabase() {
   let retries = 15;
   while (retries > 0) {
@@ -71,7 +110,23 @@ export async function initDatabase() {
     }
   }
   await runMigrations();
+  await runPoolMigrations();
   await seedDatabase();
+  await syncTopScorers();
+  scheduleSquadSync();
+  await seedAdminUser();
+  await seedPoolData();
+}
+
+/** Importa elencos sem bloquear o HTTP server (sync demora ~1–2 min). */
+export function scheduleSquadSync() {
+  syncAllSquads()
+    .then((squad) => {
+      console.log(`[squad] ${squad.teams} seleções, ${squad.players} jogadores importados`);
+    })
+    .catch((err) => {
+      console.warn('[squad] falha ao importar elencos —', err.message);
+    });
 }
 
 export { TOURNAMENT } from './seed/schedule.js';

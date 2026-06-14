@@ -6,7 +6,8 @@ COPY backend/package.json backend/package-lock.json* ./backend/
 RUN cd backend && npm install --omit=dev
 
 COPY backend/src ./backend/src
-COPY copa-2026-dashboard.html styles.css ./
+COPY backend/scripts ./backend/scripts
+COPY copa-2026-dashboard.html auth.html boloes.html styles.css ./
 COPY js ./js
 COPY data ./data
 

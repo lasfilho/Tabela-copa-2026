@@ -9,17 +9,26 @@ export function matchKickoff(match) {
   return new Date(`${match.date}T${match.time}:00${TZ_OFFSET}`);
 }
 
-export function resolveMatchStatus(match, now = new Date()) {
-  if (match.status === 'finished') return 'finished';
-  if (match.status === 'live') return 'live';
-
+export function resolveMatchStatus(match, now = new Date(), options = {}) {
+  const { allowFutureFinished = false } = options;
   const kickoff = matchKickoff(match);
   const endWindow = new Date(kickoff.getTime() + MATCH_WINDOW_MS);
+
+  if (now < kickoff && !allowFutureFinished) {
+    return 'scheduled';
+  }
+
+  if (match.status === 'finished') return 'finished';
+  if (match.status === 'live') return 'live';
 
   if (now >= kickoff && now < endWindow) return 'live';
   return 'scheduled';
 }
 
-export function applyStatuses(matches, now = new Date()) {
-  return matches.map((m) => ({ ...m, status: resolveMatchStatus(m, now) }));
+export function applyStatuses(matches, now = new Date(), mode = 'real') {
+  const allowFutureFinished = mode === 'simulation';
+  return matches.map((m) => ({
+    ...m,
+    status: resolveMatchStatus(m, now, { allowFutureFinished }),
+  }));
 }

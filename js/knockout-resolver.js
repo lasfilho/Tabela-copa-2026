@@ -69,6 +69,70 @@ function allGroupMatchesDone(data) {
   });
 }
 
+function feederWinner(byId, winners, matchId) {
+  const src = byId[matchId];
+  if (!src || src.status !== 'finished') return null;
+  return winners[matchId] ?? null;
+}
+
+function feederLoser(byId, matchId) {
+  const src = byId[matchId];
+  if (!src || src.status !== 'finished') return null;
+  return loserOf(src);
+}
+
+function fillR32FromGroups(byId, data) {
+  const positions = posMap(data);
+  const ranking = thirdPlaceRanking(data);
+  const usedThirds = new Set();
+
+  Object.entries(R32_RULES).forEach(([id, rule]) => {
+    const m = byId[id];
+    if (!m) return;
+    const { home, away } = rule(positions, usedThirds, ranking);
+    m.home = home ?? null;
+    m.away = away ?? null;
+  });
+}
+
+function clearR32Slots(byId) {
+  Object.keys(R32_RULES).forEach((id) => {
+    const m = byId[id];
+    if (m) {
+      m.home = null;
+      m.away = null;
+    }
+  });
+}
+
+function propagateKnockoutRound(byId) {
+  const tiers = [
+    ['R16-1', 'R16-2', 'R16-3', 'R16-4', 'R16-5', 'R16-6', 'R16-7', 'R16-8'],
+    ['QF-1', 'QF-2', 'QF-3', 'QF-4'],
+    ['SF-1', 'SF-2'],
+    ['FINAL', 'BRONZE'],
+  ];
+
+  for (const tier of tiers) {
+    const winners = winnersMap(Object.values(byId));
+    for (const targetId of tier) {
+      const feeders = BRACKET_FLOW[targetId];
+      if (!feeders) continue;
+      const [a, b] = feeders;
+      const m = byId[targetId];
+      if (!m) continue;
+
+      if (targetId === 'BRONZE') {
+        m.home = feederLoser(byId, a);
+        m.away = feederLoser(byId, b);
+      } else {
+        m.home = feederWinner(byId, winners, a);
+        m.away = feederWinner(byId, winners, b);
+      }
+    }
+  }
+}
+
 function winnersMap(matches) {
   const w = {};
   matches.forEach((m) => { w[m.id] = getWinner(m); });
@@ -85,37 +149,15 @@ function loserOf(match) {
 export function resolveKnockoutBracket(data) {
   const matches = data.matches.map((m) => ({ ...m }));
   const byId = Object.fromEntries(matches.map((m) => [m.id, m]));
+  const bracketData = { ...data, matches };
 
-  if (allGroupMatchesDone({ ...data, matches })) {
-    const positions = posMap({ ...data, matches });
-    const ranking = thirdPlaceRanking({ ...data, matches });
-    const usedThirds = new Set();
-
-    Object.entries(R32_RULES).forEach(([id, rule]) => {
-      const m = byId[id];
-      if (!m) return;
-      const { home, away } = rule(positions, usedThirds, ranking);
-      if (!m.home && home) m.home = home;
-      if (!m.away && away) m.away = away;
-    });
+  if (allGroupMatchesDone(bracketData)) {
+    fillR32FromGroups(byId, bracketData);
+  } else {
+    clearR32Slots(byId);
   }
 
-  const w = winnersMap(matches);
-
-  Object.entries(BRACKET_FLOW).forEach(([targetId, [a, b]]) => {
-    const m = byId[targetId];
-    if (!m) return;
-
-    if (targetId === 'BRONZE') {
-      const la = loserOf(byId[a]);
-      const lb = loserOf(byId[b]);
-      if (!m.home && la) m.home = la;
-      if (!m.away && lb) m.away = lb;
-    } else {
-      if (!m.home && w[a]) m.home = w[a];
-      if (!m.away && w[b]) m.away = w[b];
-    }
-  });
+  propagateKnockoutRound(byId);
 
   return matches;
 }

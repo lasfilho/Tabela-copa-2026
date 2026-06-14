@@ -3,7 +3,12 @@
  * Importa resultados finais e placares parciais quando a API envia (1H, 2H, HT…).
  */
 import { query } from './db.js';
+import { recalculatePoolsForMatch } from './pool/pool-ranking.js';
 import { teamIdFromSportsDb } from './sportsdb-team-map.js';
+import {
+  syncMatchGoalsFromEvent,
+  shouldResyncMatchGoals,
+} from './goal-sync.js';
 
 const LEAGUE_ID = '4429';
 const SEASON = '2026';
@@ -24,6 +29,7 @@ const state = {
   lastUpdated: 0,
   lastSkipped: 0,
   lastLive: 0,
+  lastGoalsSynced: 0,
 };
 
 function config() {
@@ -75,13 +81,23 @@ async function fetchSeasonEvents() {
 
 async function findMatchId(homeId, awayId) {
   const { rows } = await query(
-    `SELECT id FROM matches
+    `SELECT id, match_date FROM matches
      WHERE home_team = $1 AND away_team = $2
      ORDER BY match_date, match_time
      LIMIT 1`,
     [homeId, awayId]
   );
-  return rows[0]?.id ?? null;
+  if (!rows.length) return null;
+  return {
+    id: rows[0].id,
+    date: formatMatchDate(rows[0].match_date),
+  };
+}
+
+function formatMatchDate(value) {
+  if (!value) return null;
+  if (typeof value === 'string') return value.slice(0, 10);
+  return value.toISOString().slice(0, 10);
 }
 
 async function getCurrentResult(matchId) {
@@ -98,6 +114,50 @@ async function getCurrentResult(matchId) {
   };
 }
 
+async function countMatchGoals(matchId) {
+  const { rows } = await query(
+    `SELECT COUNT(*)::int AS n FROM match_goals WHERE match_id = $1`,
+    [matchId]
+  );
+  return rows[0].n;
+}
+
+async function maybeSyncGoals(
+  matchId, idEvent, idApiFootball, homeId, awayId, homeScore, awayScore, matchDate, status, becameFinished
+) {
+  if (status !== 'finished') return 0;
+
+  if (!becameFinished && !(await shouldResyncMatchGoals(matchId, homeId, awayId, homeScore, awayScore))) {
+    return 0;
+  }
+
+  try {
+    const result = await syncMatchGoalsFromEvent(
+      matchId, idEvent, homeId, awayId, homeScore, awayScore, idApiFootball, matchDate
+    );
+    if (result.ok && result.goals > 0) {
+      const extra = result.reconciledGoals
+        ? ` (+${result.reconciledGoals} reconciliados com placar)`
+        : '';
+      const src = result.usedOpenFootball
+        ? 'openfootball'
+        : result.usedApiFootball
+          ? 'API-Football'
+          : 'TheSportsDB';
+      console.log(
+        `[sync] ${matchId}: ${result.namedGoals} jogador(es), ${result.detailedGoals} artilheiro(s) [${src}], ${result.goals} no total${extra}`
+      );
+      return 1;
+    }
+    if (result.ok && result.goals === 0 && becameFinished) {
+      console.log(`[sync] ${matchId}: timeline sem gols (${result.timelineEvents} eventos)`);
+    }
+  } catch (err) {
+    console.error(`[sync] ${matchId}: falha ao importar gols —`, err.message);
+  }
+  return 0;
+}
+
 async function upsertRealScore(matchId, home, away, status) {
   await query(
     `INSERT INTO match_results (match_id, mode, home_score, away_score, status, updated_at)
@@ -109,6 +169,9 @@ async function upsertRealScore(matchId, home, away, status) {
        updated_at = NOW()`,
     [matchId, home, away, status]
   );
+  if (status === 'finished') {
+    recalculatePoolsForMatch(matchId).catch((err) => console.error('Pool ranking recalc:', err.message));
+  }
 }
 
 function parseScore(value) {
@@ -153,6 +216,7 @@ export async function runScoreSync() {
   let updated = 0;
   let skipped = 0;
   let liveCount = 0;
+  let goalsSynced = 0;
   const unmatched = [];
 
   try {
@@ -169,16 +233,26 @@ export async function runScoreSync() {
         continue;
       }
 
-      const matchId = await findMatchId(homeId, awayId);
-      if (!matchId) {
+      const matchRef = await findMatchId(homeId, awayId);
+      if (!matchRef) {
         unmatched.push(ev.strEvent);
         continue;
       }
+      const matchId = matchRef.id;
+      const matchDate = matchRef.date;
 
       const { home, away, status } = parsed;
       const current = await getCurrentResult(matchId);
 
-      if (current.home === home && current.away === away && current.status === status) {
+      const becameFinished = status === 'finished' && current.status !== 'finished';
+      const scoreChanged = current.home !== home || current.away !== away || current.status !== status;
+
+      if (!scoreChanged) {
+        if (status === 'finished') {
+          goalsSynced += await maybeSyncGoals(
+            matchId, ev.idEvent, ev.idAPIfootball, homeId, awayId, home, away, matchDate, status, becameFinished
+          );
+        }
         skipped += 1;
         continue;
       }
@@ -193,6 +267,12 @@ export async function runScoreSync() {
       updated += 1;
       if (status === 'live') liveCount += 1;
       console.log(`[sync] ${matchId}: ${home}×${away} [${status}] (${ev.strEvent}, ${parsed.apiStatus})`);
+
+      if (status === 'finished') {
+        goalsSynced += await maybeSyncGoals(
+          matchId, ev.idEvent, ev.idAPIfootball, homeId, awayId, home, away, matchDate, status, true
+        );
+      }
     }
 
     state.lastOkAt = new Date().toISOString();
@@ -200,12 +280,14 @@ export async function runScoreSync() {
     state.lastUpdated = updated;
     state.lastSkipped = skipped;
     state.lastLive = liveCount;
+    state.lastGoalsSynced = goalsSynced;
 
     return {
       ok: true,
       updated,
       skipped,
       live: liveCount,
+      goalsSynced,
       unmatched: unmatched.length,
       at: state.lastOkAt,
     };
@@ -246,5 +328,12 @@ export async function getSyncStatus() {
     intervalMinutes: Math.round(config().intervalMs / 60000),
     source: 'TheSportsDB',
     supportsLive: true,
+    supportsGoalScorers: true,
+    goalSources: [
+      'openfootball/worldcup.json',
+      'TheSportsDB lookuptimeline.php',
+      'API-Football fixtures/events (opcional)',
+    ],
+    apiFootballConfigured: Boolean(process.env.API_FOOTBALL_KEY),
   };
 }

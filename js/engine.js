@@ -67,6 +67,88 @@ export function teamStats(teamId, matches) {
   return s;
 }
 
+export function teamDetailedStats(teamId, data) {
+  const { matches, teams, groups, teamMap } = data;
+  const base = teamStats(teamId, matches);
+  const t = teamMap[teamId];
+  const finished = matches.filter(
+    (m) => m.status === 'finished' && (m.home === teamId || m.away === teamId)
+  );
+
+  const goalsByPhase = {};
+  PHASE_ORDER.forEach((p) => { goalsByPhase[p] = { gf: 0, ga: 0, played: 0 }; });
+
+  let wins = 0;
+  let draws = 0;
+  let losses = 0;
+  let cleanSheets = 0;
+
+  finished.forEach((m) => {
+    const isHome = m.home === teamId;
+    const gf = isHome ? m.homeScore : m.awayScore;
+    const ga = isHome ? m.awayScore : m.homeScore;
+    const bucket = goalsByPhase[m.phase] ?? { gf: 0, ga: 0, played: 0 };
+    bucket.gf += gf;
+    bucket.ga += ga;
+    bucket.played += 1;
+    goalsByPhase[m.phase] = bucket;
+    if (gf > ga) wins += 1;
+    else if (gf < ga) losses += 1;
+    else draws += 1;
+    if (ga === 0) cleanSheets += 1;
+  });
+
+  const allStats = teams.map((team) => ({ id: team.id, ...teamStats(team.id, matches) }));
+  const withPlayed = allStats.filter((s) => s.played > 0);
+
+  const rankBy = (field, ascending = false) => {
+    if (!withPlayed.length) return null;
+    const sorted = [...withPlayed].sort((a, b) => (
+      ascending ? a[field] - b[field] : b[field] - a[field]
+    ));
+    const idx = sorted.findIndex((s) => s.id === teamId);
+    return idx >= 0 ? idx + 1 : null;
+  };
+
+  const tournamentAvg = withPlayed.length
+    ? {
+        gf: withPlayed.reduce((sum, s) => sum + s.gf / s.played, 0) / withPlayed.length,
+        ga: withPlayed.reduce((sum, s) => sum + s.ga / s.played, 0) / withPlayed.length,
+        pts: withPlayed.reduce((sum, s) => sum + s.pts / s.played, 0) / withPlayed.length,
+      }
+    : { gf: 0, ga: 0, pts: 0 };
+
+  const groupTeams = groups.find((g) => g.id === t?.group)?.teams ?? [];
+  const standings = computeGroupStandings(t?.group, matches, groupTeams);
+  const groupPos = standings.findIndex((s) => s.code === teamId) + 1;
+
+  const teamMatches = matches
+    .filter((m) => m.home === teamId || m.away === teamId)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+
+  return {
+    ...base,
+    goalsByPhase,
+    wins,
+    draws,
+    losses,
+    cleanSheets,
+    avgGF: base.played ? (base.gf / base.played).toFixed(2) : '0.00',
+    avgGA: base.played ? (base.ga / base.played).toFixed(2) : '0.00',
+    ranks: {
+      pts: rankBy('pts'),
+      gf: rankBy('gf'),
+      ga: rankBy('ga', true),
+      gd: rankBy('gd'),
+      total: withPlayed.length,
+    },
+    tournamentAvg,
+    groupPos: groupPos || null,
+    standings,
+    teamMatches,
+  };
+}
+
 export function computeKPIs(data) {
   const { matches, teams, tournament } = data;
   const finished = matches.filter((m) => m.status === 'finished');
@@ -106,15 +188,29 @@ export function detectCurrentPhase(matches, tournament) {
   return PHASE_LABELS.group;
 }
 
+/** Rótulo simplificado para a barra de status (Visão geral / Jogos). */
+export function getStatusPhaseLabel(matches, tournament) {
+  const today = new Date().toISOString().slice(0, 10);
+  const knockoutPhases = ['r32', 'r16', 'qf', 'sf', 'bronze', 'final'];
+
+  const unfinishedGroup = matches.some((m) => m.phase === 'group' && m.status !== 'finished');
+  if (unfinishedGroup) return 'Fase de grupos';
+
+  const unfinishedKnockout = matches.some(
+    (m) => knockoutPhases.includes(m.phase) && m.status !== 'finished'
+  );
+  if (unfinishedKnockout) return 'Fase de mata-mata';
+
+  if (today < tournament.start) return 'Pré-torneio';
+  if (today > tournament.end) return 'Torneio encerrado';
+
+  const hadKnockout = matches.some((m) => knockoutPhases.includes(m.phase));
+  return hadKnockout ? 'Fase de mata-mata' : 'Fase de grupos';
+}
+
 export function aggregateStats(data) {
   const { matches, teams, teamMap, groups } = data;
   const finished = matches.filter((m) => m.status === 'finished');
-
-  const goalsByPhase = {};
-  PHASE_ORDER.forEach((p) => { goalsByPhase[p] = 0; });
-  finished.forEach((m) => {
-    goalsByPhase[m.phase] = (goalsByPhase[m.phase] || 0) + m.homeScore + m.awayScore;
-  });
 
   let wins = 0; let draws = 0; let losses = 0;
   finished.forEach((m) => {
@@ -128,17 +224,65 @@ export function aggregateStats(data) {
     return { ...t, ...s };
   }).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
 
+  const playedTeams = teamPerformance.filter((t) => t.played > 0);
+
   const attack = [...teamPerformance].sort((a, b) => b.gf - a.gf).slice(0, 8);
-  const defense = [...teamPerformance].filter((t) => t.played > 0).sort((a, b) => a.ga - b.ga).slice(0, 8);
+  const defense = [...playedTeams].sort((a, b) => a.ga - b.ga).slice(0, 8);
+
+  const topAproveitamento = [...playedTeams]
+    .sort((a, b) => b.aproveitamento - a.aproveitamento || b.pts - a.pts)
+    .slice(0, 8);
+
+  const topGoalDifference = [...playedTeams]
+    .sort((a, b) => b.gd - a.gd || b.gf - a.gf)
+    .slice(0, 8);
+
+  const resultsBreakdown = [...playedTeams]
+    .sort((a, b) => b.pts - a.pts || b.gd - a.gd)
+    .slice(0, 8);
+
+  const confederationMap = {};
+  playedTeams.forEach((t) => {
+    const key = t.confederation;
+    if (!confederationMap[key]) {
+      confederationMap[key] = { confederation: key, teams: 0, played: 0, pts: 0, gf: 0, ga: 0 };
+    }
+    const bucket = confederationMap[key];
+    bucket.teams += 1;
+    bucket.played += t.played;
+    bucket.pts += t.pts;
+    bucket.gf += t.gf;
+    bucket.ga += t.ga;
+  });
+
+  const confederationStats = Object.values(confederationMap)
+    .map((c) => ({
+      ...c,
+      avgPts: c.played ? c.pts / c.played : 0,
+      avgGF: c.played ? c.gf / c.played : 0,
+      avgGA: c.played ? c.ga / c.played : 0,
+    }))
+    .sort((a, b) => b.avgPts - a.avgPts);
 
   const groupStats = groups.map((g) => {
-    const ids = g.teams;
     const gm = finished.filter((m) => m.group === g.id);
     const goals = gm.reduce((s, m) => s + m.homeScore + m.awayScore, 0);
     return { group: g.id, goals, matches: gm.length };
   });
 
-  return { goalsByPhase, wins, draws, losses, teamPerformance, attack, defense, groupStats };
+  return {
+    wins,
+    draws,
+    losses,
+    teamPerformance,
+    attack,
+    defense,
+    topAproveitamento,
+    topGoalDifference,
+    resultsBreakdown,
+    confederationStats,
+    groupStats,
+  };
 }
 
 export function getNextMatch(matches, today = new Date().toISOString().slice(0, 10)) {
@@ -165,7 +309,7 @@ export function thirdPlaceRanking(data) {
   }).filter(Boolean).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
 }
 
-export function filterMatches(matches, filters) {
+export function filterMatches(matches, filters, teamMap = null) {
   let result = [...matches];
   const { phase, group, team, date, status, search } = filters;
 
@@ -176,15 +320,25 @@ export function filterMatches(matches, filters) {
   if (status && status !== 'all') result = result.filter((m) => m.status === status);
   if (search) {
     const q = search.toLowerCase();
-    result = result.filter((m) =>
-      m.id.toLowerCase().includes(q) ||
-      m.venue?.toLowerCase().includes(q) ||
-      m.home?.toLowerCase().includes(q) ||
-      m.away?.toLowerCase().includes(q)
-    );
+    result = result.filter((m) => matchSearchText(m, teamMap).includes(q));
   }
 
   return result.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+}
+
+function matchSearchText(m, teamMap) {
+  const homeName = teamMap?.[m.home]?.name ?? '';
+  const awayName = teamMap?.[m.away]?.name ?? '';
+  return [
+    m.id,
+    m.venue,
+    m.group,
+    m.home,
+    m.away,
+    homeName,
+    awayName,
+    m.group ? `grupo ${m.group}` : '',
+  ].filter(Boolean).join(' ').toLowerCase();
 }
 
 export function formatDate(dateStr) {
@@ -209,4 +363,70 @@ export function statusLabel(status) {
 
 export function phaseLabel(phase) {
   return PHASE_LABELS[phase] || phase;
+}
+
+export function normalizeScorers(scorers = []) {
+  return scorers.map((s) => ({
+    player: s.player,
+    team: s.team ?? s.team_id ?? s.teamId ?? '',
+    goals: Number(s.goals ?? 0),
+    assists: Number(s.assists ?? 0),
+  }));
+}
+
+export function teamScorers(data, teamId) {
+  return normalizeScorers(data.stats?.topScorers ?? [])
+    .filter((s) => s.team === teamId)
+    .sort((a, b) => b.goals - a.goals || b.assists - a.assists || a.player.localeCompare(b.player));
+}
+
+/** Gols da seleção para a página de detalhe (inclui gol contra e gols sem artilheiro). */
+export function teamGoalContributions(data, teamId) {
+  const goals = (data.stats?.matchGoals ?? []).filter((g) => g.team === teamId);
+  const ownGoals = [];
+  const scorerMap = new Map();
+  let unknownGoals = 0;
+
+  for (const g of goals) {
+    if (g.isOwnGoal && g.player) {
+      ownGoals.push({
+        kind: 'own',
+        player: g.player,
+        minute: g.minute,
+        detail: g.detail,
+      });
+      continue;
+    }
+    if (!g.player || !g.countsForScorer) {
+      unknownGoals += 1;
+      continue;
+    }
+    const key = g.player;
+    if (!scorerMap.has(key)) {
+      scorerMap.set(key, { player: g.player, goals: 0, assists: 0, minutes: [] });
+    }
+    const entry = scorerMap.get(key);
+    entry.goals += 1;
+    if (g.minute != null) entry.minutes.push(g.minute);
+  }
+
+  for (const g of goals) {
+    if (!g.assistPlayer || g.isOwnGoal || !g.countsForScorer) continue;
+    const key = g.assistPlayer;
+    if (!scorerMap.has(key)) {
+      scorerMap.set(key, { player: g.assistPlayer, goals: 0, assists: 0, minutes: [] });
+    }
+    scorerMap.get(key).assists += 1;
+  }
+
+  const scorers = [...scorerMap.values()]
+    .filter((s) => s.goals > 0 || s.assists > 0)
+    .sort((a, b) => b.goals - a.goals || b.assists - a.assists || a.player.localeCompare(b.player))
+    .map((s) => ({ kind: 'scorer', ...s }));
+
+  const result = [...scorers, ...ownGoals];
+  if (unknownGoals > 0) {
+    result.push({ kind: 'unknown', count: unknownGoals });
+  }
+  return result;
 }

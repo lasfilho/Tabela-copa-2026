@@ -1,11 +1,13 @@
 /**
  * Cliente HTTP — persistência no PostgreSQL via API.
  */
+import { authHeaders } from './auth-client.js';
+
 const API = '/api';
 
 async function request(url, options = {}) {
   const res = await fetch(`${API}${url}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...options.headers },
     ...options,
   });
   if (!res.ok) {
@@ -24,7 +26,12 @@ export async function fetchBootstrap(mode = 'real') {
     teamMap,
     groups: raw.groups,
     matches: raw.matches,
-    stats: raw.stats,
+    stats: {
+      topScorers: raw.stats?.topScorers ?? [],
+      matchGoals: raw.stats?.matchGoals ?? [],
+      squads: raw.stats?.squads ?? [],
+      meta: raw.stats?.meta ?? {},
+    },
     preferences: {
       theme: raw.preferences?.theme ?? 'dark',
       favorites: raw.preferences?.favorites ?? [],
@@ -32,6 +39,7 @@ export async function fetchBootstrap(mode = 'real') {
       activeMode: raw.preferences?.active_mode ?? 'real',
     },
     mode: raw.mode,
+    user: raw.user ?? null,
   };
 }
 

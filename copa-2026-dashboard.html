@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=40" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="data/embedded.js"></script>
 </head>
@@ -45,48 +45,61 @@
         <a href="#calendar" class="nav-link" data-section="calendar" title="Calendário">
           <span class="nav-icon">📅</span><span class="nav-label">Calendário</span>
         </a>
+        <a href="/boloes" class="nav-link nav-link--external" title="Ranking público dos bolões">
+          <span class="nav-icon">🎯</span><span class="nav-label">Ranking dos Bolões</span>
+        </a>
+        <a href="#settings" class="nav-link admin-only-nav" data-section="settings" title="Configurações" hidden>
+          <span class="nav-icon">⚙</span><span class="nav-label">Configurações</span>
+        </a>
       </nav>
 
       <div class="sidebar__footer">
-        <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" aria-label="Retrair menu" aria-expanded="true">
-          <span class="sidebar-collapse-btn__icon" aria-hidden="true">◀</span>
-          <span class="nav-label">Retrair menu</span>
-        </button>
-        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Alternar tema">
-          <span class="theme-toggle__icon">☀</span>
-          <span class="theme-toggle__label">Modo claro / escuro</span>
-        </button>
+        <div class="sidebar__user-line" id="sidebar-user-wrap" hidden>
+          <span class="sidebar__user" id="auth-user-label"></span>
+        </div>
+        <div class="sidebar__tools" aria-label="Ferramentas">
+          <button type="button" class="sidebar-tool-icon" id="export-btn" title="Exportar jogos filtrados" aria-label="Exportar">
+            <span aria-hidden="true">⬇</span>
+          </button>
+          <button type="button" class="sidebar-tool-icon" id="theme-toggle" title="Alternar tema claro/escuro" aria-label="Alternar tema">
+            <span class="theme-toggle__icon" aria-hidden="true">☀</span>
+          </button>
+        </div>
       </div>
     </aside>
+    <button type="button" class="sidebar-tab" id="sidebar-collapse-btn" aria-label="Retrair menu" aria-expanded="true" title="Retrair menu">
+      <span class="sidebar-tab__chevron" aria-hidden="true">‹</span>
+    </button>
 
     <div class="main-wrap">
       <header class="topbar">
-        <button type="button" class="menu-btn" id="menu-btn" aria-label="Retrair menu" title="Retrair menu">☰</button>
         <div class="topbar__search">
           <input type="search" id="global-search" placeholder="Buscar seleção, grupo ou jogo..." autocomplete="off" />
         </div>
         <div class="topbar__actions">
           <div class="mode-switch" id="mode-switch" role="group" aria-label="Modo de acompanhamento">
             <button type="button" class="mode-btn active" data-mode="real">Real</button>
-            <button type="button" class="mode-btn" data-mode="simulation">Simulação</button>
+            <button type="button" class="mode-btn mode-btn--auth" data-mode="simulation" hidden>Simulação</button>
+            <button type="button" class="mode-btn mode-btn--auth" data-mode="pool" hidden>Bolão</button>
           </div>
-          <div class="phase-badge" id="phase-badge">Fase de grupos</div>
-          <button type="button" class="btn btn--ghost sync-toggle" id="sync-toggle" title="Placares automáticos via TheSportsDB (grátis)">
-            <span class="sync-toggle__dot" aria-hidden="true"></span>
-            <span id="sync-toggle-label">Sync off</span>
-          </button>
-          <button type="button" class="btn btn--ghost" id="reset-scores-btn" title="Limpar placares do modo atual">Limpar placares</button>
-          <button type="button" class="btn btn--ghost" id="export-btn">Exportar</button>
+          <button type="button" class="btn btn--ghost btn--sm" id="sim-test-fill-btn" hidden title="Preencher todos os jogos da fase de grupos com placares aleatórios (somente simulação)">Teste</button>
+          <button type="button" class="btn btn--ghost btn--sm" id="sim-clear-btn" hidden title="Apagar todos os placares da simulação">Limpar</button>
+          <a href="/auth.html" class="btn btn--ghost btn--sm" id="auth-access-btn">Login</a>
+          <button type="button" class="btn btn--ghost btn--sm" id="auth-logout-btn" hidden>Logoff</button>
         </div>
       </header>
 
-      <!-- KPI strip -->
-      <div class="mode-banner mode-banner--real" id="mode-banner">Modo Real — placares salvos separadamente da simulação</div>
-      <div class="sync-banner sync-banner--off" id="sync-banner" hidden>
-        <span id="sync-banner-text">Sync automático desligado</span>
-        <button type="button" class="btn btn--ghost btn--sm" id="sync-run-btn" title="Buscar placares agora">Sincronizar agora</button>
+      <div class="status-bar" id="status-bar">
+        <span class="status-bar__phase" id="status-phase-text">Fase de grupos</span>
+        <div class="status-bar__sync admin-only" id="status-sync-wrap" hidden>
+          <span class="status-bar__sync-text" id="sync-status-text" aria-live="polite"></span>
+          <button type="button" class="btn btn--ghost btn--sm sync-toggle" id="sync-toggle" title="Ligar sync automático (TheSportsDB)" aria-label="Sync desligado">
+            Auto ↻
+          </button>
+          <span id="sync-toggle-label" class="visually-hidden">Sync off</span>
+          <button type="button" class="btn btn--ghost btn--sm" id="sync-run-btn">Sincronizar</button>
+        </div>
       </div>
-      <section class="kpi-strip" id="kpi-strip" aria-label="Indicadores do torneio"></section>
 
       <main class="content" id="content">
         <!-- OVERVIEW -->
@@ -98,6 +111,8 @@
             </div>
             <div class="countdown" id="next-countdown"></div>
           </div>
+
+          <section class="kpi-strip kpi-strip--compact" id="kpi-strip" aria-label="Indicadores do torneio"></section>
 
           <div class="grid grid--2">
             <article class="card card--accent" id="next-matches-card">
@@ -153,41 +168,61 @@
         <section class="view" id="view-knockout" data-view="knockout" hidden>
           <div class="view-header">
             <h1>Mata-mata</h1>
-            <p class="view-subtitle">Oitavas (32) até a final em Nova Jersey</p>
+            <p class="view-subtitle">Chaveamento completo da fase eliminatória até a final</p>
           </div>
           <div class="bracket-wrap" id="bracket-wrap"></div>
         </section>
 
         <!-- TEAMS -->
         <section class="view" id="view-teams" data-view="teams" hidden>
-          <div class="view-header">
-            <h1>Seleções</h1>
-            <p class="view-subtitle">48 seleções · clique para detalhes · compare duas equipes</p>
+          <div id="teams-list-panel">
+            <div class="view-header">
+              <h1>Seleções</h1>
+              <p class="view-subtitle">48 seleções · clique para ver estatísticas completas</p>
+            </div>
+            <div class="compare-bar" id="compare-bar">
+              <select id="compare-a"><option value="">Comparar A...</option></select>
+              <span>vs</span>
+              <select id="compare-b"><option value="">Comparar B...</option></select>
+              <button type="button" class="btn btn--primary" id="compare-btn">Comparar</button>
+            </div>
+            <div id="compare-result" class="compare-result"></div>
+            <div class="teams-grid" id="teams-grid"></div>
           </div>
-          <div class="compare-bar" id="compare-bar">
-            <select id="compare-a"><option value="">Comparar A...</option></select>
-            <span>vs</span>
-            <select id="compare-b"><option value="">Comparar B...</option></select>
-            <button type="button" class="btn btn--primary" id="compare-btn">Comparar</button>
-          </div>
-          <div id="compare-result" class="compare-result"></div>
-          <div class="teams-grid" id="teams-grid"></div>
+          <div id="team-detail-panel" hidden></div>
         </section>
 
         <!-- STATS -->
         <section class="view" id="view-stats" data-view="stats" hidden>
           <div class="view-header">
             <h1>Estatísticas</h1>
-            <p class="view-subtitle">Tendências e comparativos do torneio</p>
+            <p class="view-subtitle">Comparativos entre seleções e confederações</p>
           </div>
           <div class="charts-grid" id="charts-grid">
-            <article class="card"><div class="card__header"><h2>Gols por fase</h2></div><div class="card__body chart-wrap"><canvas id="chart-goals-phase"></canvas></div></article>
-            <article class="card"><div class="card__header"><h2>Distribuição de resultados</h2></div><div class="card__body chart-wrap"><canvas id="chart-results"></canvas></div></article>
+            <article class="card"><div class="card__header"><h2>Top aproveitamento</h2></div><div class="card__body chart-wrap"><canvas id="chart-aproveitamento"></canvas></div></article>
+            <article class="card"><div class="card__header"><h2>Saldo de gols</h2></div><div class="card__body chart-wrap"><canvas id="chart-goal-diff"></canvas></div></article>
+            <article class="card card--wide"><div class="card__header"><h2>V-E-D por seleção (top 8)</h2></div><div class="card__body chart-wrap"><canvas id="chart-results-teams"></canvas></div></article>
+            <article class="card card--wide"><div class="card__header"><h2>Média por confederação</h2></div><div class="card__body chart-wrap"><canvas id="chart-confederation"></canvas></div></article>
             <article class="card"><div class="card__header"><h2>Melhor ataque</h2></div><div class="card__body chart-wrap"><canvas id="chart-attack"></canvas></div></article>
             <article class="card"><div class="card__header"><h2>Melhor defesa</h2></div><div class="card__body chart-wrap"><canvas id="chart-defense"></canvas></div></article>
             <article class="card card--wide"><div class="card__header"><h2>Comparativo entre grupos</h2></div><div class="card__body chart-wrap"><canvas id="chart-groups"></canvas></div></article>
             <article class="card card--wide"><div class="card__header"><h2>Ranking por desempenho</h2></div><div class="card__body" id="performance-ranking"></div></article>
+            <article class="card card--wide"><div class="card__header"><h2>Artilheiros</h2></div><div class="card__body" id="top-scorers-ranking"></div></article>
           </div>
+        </section>
+
+        <!-- POOL (Bolão) -->
+        <section class="view" id="view-pool" data-view="pool" hidden>
+          <div class="view-header">
+            <h1>Bolão</h1>
+            <p class="view-subtitle">Palpites recreativos — sem apostas ou premiação pelo sistema</p>
+          </div>
+          <div id="pool-content"></div>
+        </section>
+
+        <!-- SETTINGS (Admin) -->
+        <section class="view" id="view-settings" data-view="settings" hidden>
+          <div id="settings-content"></div>
         </section>
 
         <!-- CALENDAR -->
@@ -220,8 +255,16 @@
     <div class="modal__body" id="modal-team-body"></div>
   </dialog>
 
+  <dialog class="modal" id="pool-participant-modal">
+    <div class="modal__header">
+      <h2 id="pool-participant-modal-title">Participante</h2>
+      <button type="button" class="modal__close" id="pool-participant-modal-close" aria-label="Fechar">×</button>
+    </div>
+    <div class="modal__body" id="pool-participant-modal-body"></div>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=5"></script>
+  <script type="module" src="js/app.js?v=17"></script>
 </body>
 </html>

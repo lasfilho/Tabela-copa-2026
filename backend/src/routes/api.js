@@ -1,12 +1,15 @@
 import { Router } from 'express';
-import { query, withTransaction } from '../db.js';
+import { query } from '../db.js';
 import { TOURNAMENT } from '../seed.js';
 import { resolveMatchStatus } from '../match-status.js';
 import { getSyncStatus, setSyncEnabled, runScoreSync } from '../score-sync.js';
+import { authMiddleware, canWriteScores, requireAdmin } from '../auth.js';
+import { recalculatePoolsForMatch } from '../pool/pool-ranking.js';
 
 const router = Router();
+router.use(authMiddleware);
 
-function mapMatchRow(row) {
+function mapMatchRow(row, mode = 'real') {
   const match = {
     id: row.id,
     phase: row.phase,
@@ -22,17 +25,22 @@ function mapMatchRow(row) {
     awayScore: row.away_score ?? null,
     status: row.status ?? 'scheduled',
   };
-  match.status = resolveMatchStatus(match);
+  match.status = resolveMatchStatus(match, new Date(), {
+    allowFutureFinished: mode === 'simulation',
+  });
   return match;
 }
 
 /** GET /api/bootstrap?mode=real */
 router.get('/bootstrap', async (req, res, next) => {
   try {
-    const mode = req.query.mode === 'simulation' ? 'simulation' : 'real';
+    let mode = req.query.mode === 'simulation' ? 'simulation' : 'real';
+    if (mode === 'simulation' && !req.user) {
+      mode = 'real';
+    }
 
-    const [teamsRes, groupsRes, matchesRes, scorersRes, prefsRes] = await Promise.all([
-      query(`SELECT id, name, flag, "group", confederation FROM teams ORDER BY "group", name`),
+    const [teamsRes, groupsRes, matchesRes, scorersRes, matchGoalsRes, squadRes, prefsRes] = await Promise.all([
+      query(`SELECT id, name, flag, "group", confederation, coach, probable_formation FROM teams ORDER BY "group", name`),
       query(`
         SELECT g.id, g.name, COALESCE(json_agg(gt.team_id ORDER BY gt.team_id) FILTER (WHERE gt.team_id IS NOT NULL), '[]') AS teams
         FROM groups_meta g
@@ -49,21 +57,60 @@ router.get('/bootstrap', async (req, res, next) => {
         SELECT ts.player, ts.team_id AS team, ts.goals, ts.assists
         FROM top_scorers ts ORDER BY ts.goals DESC, ts.player
       `),
+      query(`
+        SELECT
+          mg.match_id AS "matchId",
+          mg.player,
+          mg.team_id AS team,
+          mg.minute,
+          mg.detail,
+          mg.assist_player AS "assistPlayer",
+          mg.is_own_goal AS "isOwnGoal",
+          mg.counts_for_scorer AS "countsForScorer",
+          mg.source
+        FROM match_goals mg
+        JOIN match_results r ON r.match_id = mg.match_id AND r.mode = 'real'
+        WHERE r.status = 'finished'
+        ORDER BY mg.match_id, mg.minute NULLS LAST, mg.id
+      `),
+      query(`
+        SELECT
+          team_id AS team,
+          player,
+          shirt_name AS "shirtName",
+          shirt_number AS number,
+          position,
+          club,
+          birth_date AS "birthDate",
+          height_cm AS "heightCm",
+          photo_url AS "photoUrl",
+          bio,
+          is_probable_starter AS "isProbableStarter",
+          source
+        FROM team_players
+        ORDER BY team_id, is_probable_starter DESC, shirt_number NULLS LAST, player
+      `),
       query(`SELECT theme, favorites, expanded_groups, active_mode, score_sync_enabled FROM app_preferences WHERE id = 1`),
     ]);
 
     const teams = teamsRes.rows;
     const groups = groupsRes.rows.map((g) => ({ id: g.id, name: g.name, teams: g.teams }));
-    const matches = matchesRes.rows.map(mapMatchRow);
+    const matches = matchesRes.rows.map((row) => mapMatchRow(row, mode));
 
     res.json({
       tournament: TOURNAMENT,
       teams,
       groups,
       matches,
-      stats: { topScorers: scorersRes.rows, meta: { timezone: 'America/Sao_Paulo' } },
+      stats: {
+        topScorers: scorersRes.rows,
+        matchGoals: matchGoalsRes.rows,
+        squads: squadRes.rows,
+        meta: { timezone: 'America/Sao_Paulo' },
+      },
       preferences: prefsRes.rows[0] ?? { theme: 'dark', favorites: [], expanded_groups: [], active_mode: 'real' },
       mode,
+      user: req.user ? { id: req.user.id, name: req.user.name, email: req.user.email, role: req.user.role } : null,
     });
   } catch (err) {
     next(err);
@@ -75,6 +122,14 @@ router.put('/matches/:id/score', async (req, res, next) => {
   try {
     const { id } = req.params;
     const mode = req.body.mode === 'simulation' ? 'simulation' : 'real';
+
+    if (!canWriteScores(req.user, mode)) {
+      return res.status(403).json({
+        error: mode === 'real'
+          ? 'Modo Real é somente leitura. Apenas administradores podem editar.'
+          : 'Faça login para editar placares na simulação.',
+      });
+    }
     const { homeScore, awayScore } = req.body;
 
     const matchRes = await query(`SELECT id, phase FROM matches WHERE id = $1`, [id]);
@@ -109,7 +164,11 @@ router.put('/matches/:id/score', async (req, res, next) => {
       WHERE m.id = $1
     `, [id, mode]);
 
-    res.json(mapMatchRow(rows[0]));
+    res.json(mapMatchRow(rows[0], mode));
+
+    if (mode === 'real' && home != null && away != null) {
+      recalculatePoolsForMatch(id).catch((err) => console.error('Pool ranking recalc:', err.message));
+    }
   } catch (err) {
     next(err);
   }
@@ -119,6 +178,9 @@ router.put('/matches/:id/score', async (req, res, next) => {
 router.delete('/scores', async (req, res, next) => {
   try {
     const mode = req.query.mode === 'simulation' ? 'simulation' : 'real';
+    if (!canWriteScores(req.user, mode)) {
+      return res.status(403).json({ error: 'Sem permissão para limpar placares neste modo' });
+    }
     await query(`DELETE FROM match_results WHERE mode = $1`, [mode]);
     res.json({ ok: true, mode });
   } catch (err) {
@@ -176,7 +238,7 @@ router.get('/sync/status', async (_req, res, next) => {
 });
 
 /** PUT /api/sync/toggle */
-router.put('/sync/toggle', async (req, res, next) => {
+router.put('/sync/toggle', requireAdmin, async (req, res, next) => {
   try {
     const enabled = Boolean(req.body.enabled);
     await setSyncEnabled(enabled);
@@ -190,7 +252,7 @@ router.put('/sync/toggle', async (req, res, next) => {
 });
 
 /** POST /api/sync/run — sincronização manual */
-router.post('/sync/run', async (_req, res, next) => {
+router.post('/sync/run', requireAdmin, async (_req, res, next) => {
   try {
     const result = await runScoreSync();
     res.json({ ...result, ...(await getSyncStatus()) });

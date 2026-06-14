@@ -4,70 +4,146 @@
 import { flagUrl } from './data-service.js';
 import {
   computeGroupStandings, computeKPIs, aggregateStats, getNextMatch,
-  getWinner, thirdPlaceRanking, filterMatches, teamStats,
+  getWinner, thirdPlaceRanking, filterMatches, teamStats, teamDetailedStats,
+  teamGoalContributions,
+  teamScorers, normalizeScorers,
   formatDate, formatDateShort, isToday, statusLabel, phaseLabel,
 } from './engine.js';
 import { groupProgress } from './knockout-resolver.js';
+import { matchKickoff } from './match-status.js';
+import { renderKnockoutBracket } from './bracket-view.js';
+import { buildPermissions } from './permissions.js';
+import { teamShortLabelHTML } from './team-names.js';
+import { renderTeamLineupInfographic, bindLineupPlayerTooltips } from './team-lineup.js';
 
 let onScoreSave = () => {};
+let perms = buildPermissions(null, 'real');
+
+export function setPermissions(user, mode) {
+  perms = buildPermissions(user, mode);
+  document.body.classList.toggle('read-only', perms.readOnly);
+  document.body.classList.toggle('score-autosave', mode === 'simulation');
+  document.body.dataset.userRole = perms.role;
+}
+
+export function getPermissions() {
+  return perms;
+}
 
 export function setScoreSaveHandler(fn) {
   onScoreSave = fn;
 }
 
 export function updateModeUI(mode) {
-  const banner = document.getElementById('mode-banner');
   const subtitle = document.getElementById('mode-subtitle');
   document.querySelectorAll('.mode-btn').forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === mode);
   });
   if (mode === 'simulation') {
-    banner.className = 'mode-banner mode-banner--simulation';
-    banner.textContent = 'Modo Simulação — cenários hipotéticos salvos no banco, separados do modo real';
     if (subtitle) subtitle.textContent = 'Simule resultados e acompanhe classificação e chaveamento projetados';
+  } else if (mode === 'pool') {
+    if (subtitle) subtitle.textContent = 'Funcionalidade em desenvolvimento';
   } else {
-    banner.className = 'mode-banner mode-banner--real';
-    banner.textContent = 'Modo Real — placares salvos no PostgreSQL (persistem ao recarregar)';
-    if (subtitle) subtitle.textContent = 'Placares reais salvos separadamente da simulação';
+    if (subtitle) subtitle.textContent = perms.readOnly
+      ? 'Acompanhe os resultados oficiais da Copa'
+      : 'Registre placares oficiais conforme os jogos terminam';
   }
 }
 
+export function scoreDisplayHTML(match) {
+  const hs = match.homeScore ?? '–';
+  const as = match.awayScore ?? '–';
+  return `<span class="score-readonly">${hs} × ${as}</span>`;
+}
+
 export function scoreEditorHTML(match, compact = false) {
+  if (!perms.canEditScores) return scoreDisplayHTML(match);
+  const autoSave = perms.mode === 'simulation';
   const hs = match.homeScore ?? '';
   const as = match.awayScore ?? '';
+  const actions = autoSave
+    ? ''
+    : `<button type="button" class="btn btn--primary btn--sm" data-save-score="${match.id}">${compact ? 'OK' : 'Salvar'}</button>`;
   return `
-    <div class="score-editor" data-match-id="${match.id}">
+    <div class="score-editor${autoSave ? ' score-editor--autosave' : ''}" data-match-id="${match.id}">
       <input type="number" min="0" max="20" inputmode="numeric" data-side="home" value="${hs}" aria-label="Gols mandante" />
       <span class="score-editor__sep">×</span>
       <input type="number" min="0" max="20" inputmode="numeric" data-side="away" value="${as}" aria-label="Gols visitante" />
-      <button type="button" class="btn btn--primary btn--sm" data-save-score="${match.id}">${compact ? 'OK' : 'Salvar'}</button>
-      ${match.status === 'finished' ? `<button type="button" class="btn btn--ghost btn--sm" data-clear-score="${match.id}">Limpar</button>` : ''}
+      ${actions}
     </div>`;
 }
 
-export function bindScoreEditors(root, handler) {
+function readScoreEditor(wrap) {
+  const home = wrap.querySelector('[data-side="home"]')?.value ?? '';
+  const away = wrap.querySelector('[data-side="away"]')?.value ?? '';
+  return { id: wrap.dataset.matchId, home, away };
+}
+
+export function bindScoreEditors(root, handler, options = {}) {
   if (!root) return;
-  root.querySelectorAll('[data-save-score]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const wrap = btn.closest('.score-editor');
-      const home = wrap.querySelector('[data-side="home"]').value;
-      const away = wrap.querySelector('[data-side="away"]').value;
-      handler(btn.dataset.saveScore, home, away);
-    });
-  });
-  root.querySelectorAll('[data-clear-score]').forEach((btn) => {
-    btn.addEventListener('click', () => handler(btn.dataset.clearScore, '', ''));
-  });
-  root.querySelectorAll('.score-editor input').forEach((input) => {
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const wrap = input.closest('.score-editor');
-        const id = wrap.dataset.matchId;
-        const home = wrap.querySelector('[data-side="home"]').value;
-        const away = wrap.querySelector('[data-side="away"]').value;
-        handler(id, home, away);
+  const autoSave = options.autoSave ?? Boolean(root.querySelector('.score-editor--autosave'));
+  const lastSaved = new Map();
+
+  const commit = (wrap, { quiet = autoSave } = {}) => {
+    if (!wrap?.dataset.matchId) return;
+    const { id, home, away } = readScoreEditor(wrap);
+    const homeEmpty = home === '';
+    const awayEmpty = away === '';
+
+    if (homeEmpty || awayEmpty) {
+      if (homeEmpty && awayEmpty && lastSaved.has(id) && lastSaved.get(id) !== '|') {
+        Promise.resolve(handler(id, '', '', { quiet }))
+          .then(() => lastSaved.set(id, '|'))
+          .catch(() => {});
       }
+      return;
+    }
+
+    const key = `${home}|${away}`;
+    if (lastSaved.get(id) === key) return;
+
+    Promise.resolve(handler(id, home, away, { quiet }))
+      .then(() => lastSaved.set(id, key))
+      .catch(() => {});
+  };
+
+  if (!autoSave) {
+    root.querySelectorAll('[data-save-score]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        commit(btn.closest('.score-editor'), { quiet: false });
+      });
     });
+  }
+
+  root.querySelectorAll('.score-editor').forEach((wrap) => {
+    const inputs = wrap.querySelectorAll('input[data-side]');
+    if (!inputs.length) return;
+
+    const { id, home, away } = readScoreEditor(wrap);
+    if (id && home !== '' && away !== '') {
+      lastSaved.set(id, `${home}|${away}`);
+    }
+
+    if (autoSave) {
+      let timer;
+      const schedule = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => commit(wrap, { quiet: true }), 500);
+      };
+      inputs.forEach((input) => {
+        input.addEventListener('input', schedule);
+        input.addEventListener('change', () => commit(wrap, { quiet: true }));
+      });
+      wrap.addEventListener('focusout', (e) => {
+        if (!wrap.contains(e.relatedTarget)) commit(wrap, { quiet: true });
+      });
+    } else {
+      inputs.forEach((input) => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') commit(wrap, { quiet: false });
+        });
+      });
+    }
   });
 }
 
@@ -81,7 +157,7 @@ export function openScoreModal(data, matchId, handler) {
       ${formatDate(m.date)} · ${m.time} · ${m.venue || phaseLabel(m.phase)}
     </p>
     <div style="margin:1rem 0;text-align:center">${scoreEditorHTML(m)}</div>
-    <p style="font-size:0.78rem;color:var(--text-muted)">Enter para salvar · Limpar remove o resultado</p>`;
+    <p style="font-size:0.78rem;color:var(--text-muted)">${perms.mode === 'simulation' ? 'Placar salvo automaticamente ao editar' : 'Enter para salvar · Limpar remove o resultado'}</p>`;
   bindScoreEditors(document.getElementById('score-modal-body'), handler);
   document.getElementById('score-modal').showModal();
 }
@@ -96,7 +172,6 @@ export function renderKPIs(data, container) {
     { label: 'Gols', value: k.totalGoals },
     { label: 'Média gols/jogo', value: k.avgGoals },
     { label: 'Empates', value: k.draws },
-    { label: 'Fase atual', value: k.currentPhase, small: true },
   ];
 
   container.innerHTML = items.map((i) => `
@@ -171,7 +246,7 @@ function matchRowHTML(data, m, state, compact = false, editable = false) {
         ${m.away ? `<img class="flag" src="${flagUrl(data.teamMap[m.away])}" alt="" />` : ''}
         <span>${teamName(data, m.away)}</span>
       </div>
-      ${compact ? '' : `<div class="match-row__meta">${formatDate(m.date)} · ${m.time} BRT · ${m.venue || phaseLabel(m.phase)}${!editable ? ` · <button type="button" class="expand-btn" data-edit-match="${m.id}">Editar placar</button>` : ''}</div>`}
+      ${compact ? '' : `<div class="match-row__meta">${formatDate(m.date)} · ${m.time} BRT · ${m.venue || phaseLabel(m.phase)}${perms.canEditScores && !editable ? ` · <button type="button" class="expand-btn" data-edit-match="${m.id}">Editar placar</button>` : ''}</div>`}
     </div>`;
 }
 
@@ -183,8 +258,9 @@ export function renderOverview(data, state) {
     .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
     .slice(0, 5);
 
+  const now = new Date();
   const recent = data.matches
-    .filter((m) => m.status === 'finished')
+    .filter((m) => m.status === 'finished' && matchKickoff(m) <= now)
     .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time))
     .slice(0, 5);
 
@@ -208,7 +284,7 @@ export function renderOverview(data, state) {
     <div class="highlight-item"><span>Grupo mais goleador</span><strong>${agg.groupStats.sort((a,b)=>b.goals-a.goals)[0]?.group ?? '—'}</strong></div>
   `;
 
-  const scorers = data.stats.topScorers ?? [];
+  const scorers = normalizeScorers(data.stats?.topScorers ?? []);
   document.getElementById('top-scorers-mini').innerHTML = scorers.length
     ? scorers.slice(0, 5).map((s, i) => `
       <div class="scorer-row">
@@ -230,6 +306,9 @@ export function renderOverview(data, state) {
 
 function favBtn(id, state) {
   const active = state.favorites.includes(id) ? 'active' : '';
+  if (!perms.canFavorite) {
+    return active ? '<span class="fav-star fav-star--readonly active" aria-hidden="true">★</span>' : '';
+  }
   return `<button class="fav-star ${active}" data-fav="${id}" title="Favoritar">★</button>`;
 }
 
@@ -239,18 +318,20 @@ function renderStandingsTable(data, groupId, standings, state, qualifiedThirds, 
     .filter((m) => m.phase === 'group' && m.group === groupId)
     .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
 
+  const labelTeam = (id) => (mini ? teamName(data, id) : teamShortLabelHTML(data, id));
+
   const matchesBlock = !mini && expanded ? `
     <div class="group-matches">
       ${groupMatches.map((m) => `
         <div class="group-match-item">
           <div class="group-match-item__team">
             <img class="flag" src="${flagUrl(data.teamMap[m.home])}" alt="" />
-            ${teamName(data, m.home)}
+            ${labelTeam(m.home)}
           </div>
           ${scoreEditorHTML(m)}
           <div class="group-match-item__team away">
             <img class="flag" src="${flagUrl(data.teamMap[m.away])}" alt="" />
-            ${teamName(data, m.away)}
+            ${labelTeam(m.away)}
           </div>
           <span class="status-pill status-pill--${m.status}">${statusLabel(m.status)}</span>
           <div class="group-match-item__meta">Rodada ${m.matchday} · ${formatDate(m.date)} · ${m.time} BRT</div>
@@ -258,18 +339,20 @@ function renderStandingsTable(data, groupId, standings, state, qualifiedThirds, 
     </div>` : '';
 
   const toggleBtn = !mini ? `
-    <button type="button" class="expand-btn" data-toggle-group="${groupId}">
-      ${expanded ? '▾ Ocultar jogos' : '▸ Editar jogos'} (${progress.done}/${progress.total})
-    </button>` : '';
+    <div class="group-card__actions">
+      <button type="button" class="expand-btn" data-toggle-group="${groupId}">
+        ${expanded ? '▾ Ocultar jogos' : '▸ Editar jogos'} (${progress.done}/${progress.total})
+      </button>
+    </div>` : '';
 
   return `
-    <div class="group-card card ${standings.some((s) => isHighlighted(data, state, s.code)) ? 'highlight' : ''}" data-group="${groupId}">
-      <div class="card__header" style="padding:0.65rem 0.85rem">
-        <h2 style="font-size:0.9rem;margin:0">Grupo ${groupId}</h2>
+    <div class="group-card card ${mini ? '' : 'group-card--full'} ${standings.some((s) => isHighlighted(data, state, s.code)) ? 'highlight' : ''}" data-group="${groupId}">
+      <div class="card__header group-card__header">
+        <h2>Grupo ${groupId}</h2>
         <span class="group-card__progress">${progress.done}/${progress.total} jogos</span>
       </div>
-      <div style="overflow-x:auto;padding:0 0.5rem 0.5rem">
-        <table class="standings">
+      <div class="group-card__table-wrap">
+        <table class="standings ${mini ? '' : 'standings--compact-names'}">
           <thead><tr>
             <th>Seleção</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th>
             ${mini ? '' : '<th>GP</th><th>GC</th>'}
@@ -279,10 +362,10 @@ function renderStandingsTable(data, groupId, standings, state, qualifiedThirds, 
             ${standings.map((s, i) => {
               const cls = i < 2 ? 'qualified' : i === 2 && qualifiedThirds?.has(s.code) ? 'third' : '';
               return `<tr class="${cls}">
-                <td><div class="team-name">${favBtn(s.code, state)}<img class="flag" src="${flagUrl(data.teamMap[s.code])}" alt="" /><span>${teamName(data, s.code)}</span></div></td>
+                <td><div class="team-name">${favBtn(s.code, state)}<img class="flag" src="${flagUrl(data.teamMap[s.code])}" alt="" />${mini ? `<span>${teamName(data, s.code)}</span>` : teamShortLabelHTML(data, s.code)}</div></td>
                 <td>${i + 1}º</td><td>${s.played}</td><td>${s.won}</td><td>${s.drawn}</td><td>${s.lost}</td>
                 ${mini ? '' : `<td>${s.gf}</td><td>${s.ga}</td>`}
-                <td>${s.gd > 0 ? '+' + s.gd : s.gd}</td><td><strong>${s.pts}</strong></td>
+                <td>${s.gd > 0 ? '+' + s.gd : s.gd}</td><td><span class="standings__pts">${s.pts}</span></td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -330,7 +413,9 @@ export function renderGroups(data, state, onToggleGroup) {
     }).join('');
 
   bindFavButtons(document.getElementById('groups-grid'), state, onFavToggle);
-  bindScoreEditors(document.getElementById('groups-grid'), onScoreSave);
+  bindScoreEditors(document.getElementById('groups-grid'), onScoreSave, {
+    autoSave: perms.mode === 'simulation',
+  });
 
   document.getElementById('groups-grid').querySelectorAll('[data-toggle-group]').forEach((btn) => {
     btn.addEventListener('click', () => onToggleGroup?.(btn.dataset.toggleGroup));
@@ -375,36 +460,48 @@ export function renderMatchesFilters(data, state, onChange) {
   });
 }
 
+function matchMetaLineHTML(m) {
+  const parts = [
+    phaseLabel(m.phase),
+    m.group ? `Grupo ${m.group}` : null,
+    formatDate(m.date),
+    `${m.time} BRT`,
+    m.venue || null,
+  ].filter(Boolean);
+
+  return parts
+    .map((text, i) => `${i ? '<span class="match-list-card__meta-sep" aria-hidden="true">·</span>' : ''}<span>${text}</span>`)
+    .join('');
+}
+
 function matchListCardHTML(data, state, m) {
   const hl = isHighlighted(data, state, m.home) || isHighlighted(data, state, m.away);
   const today = isToday(m.date);
-  const groupLabel = m.group ? ` · Grupo ${m.group}` : '';
+  const homeLabel = m.home ? teamShortLabelHTML(data, m.home) : '<span class="team-name__text">—</span>';
+  const awayLabel = m.away ? teamShortLabelHTML(data, m.away) : '<span class="team-name__text">—</span>';
 
   return `
     <article class="match-list-card ${hl ? 'highlight' : ''} ${today ? 'today' : ''}" data-match="${m.id}">
-      <div class="match-list-card__head">
-        <span class="match-list-card__phase">${phaseLabel(m.phase)}${groupLabel}</span>
-        <span class="status-pill status-pill--${m.status}">${statusLabel(m.status)}</span>
-      </div>
-      <div class="match-list-card__teams">
+      <div class="match-list-card__meta">${matchMetaLineHTML(m)}</div>
+      <div class="match-list-card__fixture">
         <div class="match-list-card__team">
           ${m.home ? `<img class="flag" src="${flagUrl(data.teamMap[m.home])}" alt="" />` : ''}
-          <span>${teamName(data, m.home)}</span>
+          ${homeLabel}
         </div>
         <div class="match-list-card__score">${scoreEditorHTML(m, true)}</div>
         <div class="match-list-card__team away">
+          ${awayLabel}
           ${m.away ? `<img class="flag" src="${flagUrl(data.teamMap[m.away])}" alt="" />` : ''}
-          <span>${teamName(data, m.away)}</span>
         </div>
-      </div>
-      <div class="match-list-card__meta">
-        ${formatDate(m.date)} · ${m.time} BRT${m.venue ? ` · ${m.venue}` : ''}
+        <div class="match-list-card__status">
+          <span class="status-pill status-pill--${m.status}">${statusLabel(m.status)}</span>
+        </div>
       </div>
     </article>`;
 }
 
 export function renderMatchesTable(data, state) {
-  const filtered = filterMatches(data.matches, { ...state.matchFilters, search: state.search });
+  const filtered = filterMatches(data.matches, { ...state.matchFilters, search: state.search }, data.teamMap);
   const wrap = document.getElementById('matches-table-wrap');
 
   if (!filtered.length) {
@@ -420,87 +517,236 @@ export function renderMatchesTable(data, state) {
 }
 
 export function renderKnockout(data, state) {
-  const rounds = [
-    { key: 'r32', title: 'Oitavas (32)' },
-    { key: 'r16', title: 'Oitavas (16)' },
-    { key: 'qf', title: 'Quartas' },
-    { key: 'sf', title: 'Semifinais' },
-    { key: 'bronze', title: '3º lugar' },
-    { key: 'final', title: 'Final' },
-  ];
-
-  document.getElementById('bracket-wrap').innerHTML = `
-    <p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 1rem">
-      Complete a fase de grupos para preencher confrontos · registre placares para avançar rodadas
-    </p>
-    <div class="bracket">
-      ${rounds.map(({ key, title }) => {
-        const ms = data.matches.filter((m) => m.phase === key);
-        return `<div class="bracket-round">
-          <h3>${title}</h3>
-          ${ms.map((m) => {
-            const w = getWinner(m);
-            const renderT = (code) => {
-              if (!code) return '<div class="bracket-team">—</div>';
-              return `<div class="bracket-team ${w === code ? 'winner' : ''}"><img class="flag" src="${flagUrl(data.teamMap[code])}" alt="" /> ${teamName(data, code)}</div>`;
-            };
-            return `<div class="bracket-match">
-              <div class="bracket-match__label">${m.label || m.id}</div>
-              ${renderT(m.home)}${renderT(m.away)}
-              <div class="bracket-score">${scoreEditorHTML(m, true)}</div>
-              <div style="font-size:0.65rem;color:var(--text-muted);margin-top:0.25rem">${formatDate(m.date)} · ${m.time}</div>
-            </div>`;
-          }).join('')}
-        </div>`;
-      }).join('')}
-    </div>`;
+  document.getElementById('bracket-wrap').innerHTML = renderKnockoutBracket(data, {
+    canEditScores: perms.canEditScores,
+    autoSaveScores: perms.mode === 'simulation',
+  });
 }
 
 export function renderTeams(data, state, onTeamClick) {
+  const listPanel = document.getElementById('teams-list-panel');
+  const detailPanel = document.getElementById('team-detail-panel');
+  if (listPanel) listPanel.hidden = false;
+  if (detailPanel) detailPanel.hidden = true;
+
   const q = state.search.toLowerCase();
   const teams = data.teams
     .filter((t) => !q || t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q))
     .sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
 
   document.getElementById('teams-grid').innerHTML = teams.map((t) => {
-    const s = teamStats(t.id, data.matches);
-    const standings = computeGroupStandings(t.group, data.matches, data.groups.find((g) => g.id === t.group).teams);
-    const pos = standings.findIndex((x) => x.code === t.id) + 1;
-    const fav = state.favorites.includes(t.id);
     const hl = isHighlighted(data, state, t.id);
-
-    return `<article class="team-card ${fav ? 'favorite' : ''} ${hl ? 'highlight' : ''}" data-team="${t.id}">
-      <div class="team-card__head">
-        <img src="${flagUrl(t)}" alt="" />
-        <div><h3>${t.name}</h3><div class="team-card__meta">Grupo ${t.group} · ${pos}º · ${t.confederation}</div></div>
-        <button class="fav-star ${fav ? 'active' : ''}" data-fav="${t.id}">★</button>
-      </div>
-      <div class="team-stats-row">
-        <div><strong>${s.pts}</strong>Pts</div>
-        <div><strong>${s.played}</strong>J</div>
-        <div><strong>${s.gf}-${s.ga}</strong>Gols</div>
-        <div><strong>${s.aproveitamento}%</strong>Aprov.</div>
-      </div>
-    </article>`;
+    return `<button type="button" class="team-card team-card--simple ${hl ? 'highlight' : ''}" data-team="${t.id}">
+      <img class="team-card__flag" src="${flagUrl(t)}" alt="" />
+      <span class="team-card__name">${t.name}</span>
+    </button>`;
   }).join('');
 
-  document.getElementById('teams-grid').querySelectorAll('.team-card').forEach((card) => {
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('[data-fav]')) return;
-      onTeamClick(card.dataset.team);
-    });
+  document.getElementById('teams-grid').querySelectorAll('[data-team]').forEach((card) => {
+    card.addEventListener('click', () => onTeamClick(card.dataset.team));
   });
-
-  bindFavButtons(document.getElementById('teams-grid'), state, onFavToggle);
 
   const selA = document.getElementById('compare-a');
   const selB = document.getElementById('compare-b');
-  if (selA.options.length <= 1) {
+  if (selA && selA.options.length <= 1) {
     data.teams.forEach((t) => {
       selA.add(new Option(t.name, t.id));
       selB.add(new Option(t.name, t.id));
     });
   }
+}
+
+function rankLabel(rank, total) {
+  if (!rank || !total) return '—';
+  return `${rank}º de ${total}`;
+}
+
+function scorerRowHTML(s) {
+  const assists = s.assists > 0 ? ` · ${s.assists} assist.` : '';
+  return `<div class="scorer-row">
+    <span>${s.player}</span>
+    <span class="scorer-goals">${s.goals} gol${s.goals !== 1 ? 's' : ''}${assists}</span>
+  </div>`;
+}
+
+function teamGoalContributionRowHTML(item) {
+  if (item.kind === 'own') {
+    const min = item.minute != null ? ` (${item.minute}')` : '';
+    return `<div class="scorer-row scorer-row--own">
+      <span>${item.player}</span>
+      <span class="scorer-goals">gol contra${min}</span>
+    </div>`;
+  }
+  if (item.kind === 'unknown') {
+    return `<div class="scorer-row scorer-row--unknown">
+      <span>Gol${item.count !== 1 ? 's' : ''} não identificado${item.count !== 1 ? 's' : ''} na API</span>
+      <span class="scorer-goals">${item.count} gol${item.count !== 1 ? 's' : ''}</span>
+    </div>`;
+  }
+  return scorerRowHTML(item);
+}
+
+function teamScorersBlockHTML(data, teamId, teamGF = 0) {
+  const contributions = teamGoalContributions(data, teamId);
+  if (contributions.length) {
+    return contributions.map(teamGoalContributionRowHTML).join('');
+  }
+
+  const scorers = teamScorers(data, teamId);
+  if (scorers.length) {
+    return scorers.map(scorerRowHTML).join('');
+  }
+  if (teamGF > 0) {
+    return `<div class="team-detail-scorers-fallback">
+      <p>A seleção marcou <strong>${teamGF} gols</strong> no torneio.</p>
+      <p class="team-detail-scorers-fallback__hint">Nenhum artilheiro individual cadastrado para esta seleção.</p>
+    </div>`;
+  }
+  return '<div class="empty">Nenhum gol registrado para esta seleção ainda</div>';
+}
+
+function teamDetailMatchHTML(data, m, teamId) {
+  const isHome = m.home === teamId;
+  const oppId = isHome ? m.away : m.home;
+  const opp = data.teamMap[oppId];
+  const gf = isHome ? m.homeScore : m.awayScore;
+  const ga = isHome ? m.awayScore : m.homeScore;
+  const scoreText = m.status === 'finished' || m.status === 'live'
+    ? `${gf ?? '–'} × ${ga ?? '–'}`
+    : '– × –';
+  let result = '';
+  if (m.status === 'finished' && gf != null && ga != null) {
+    if (gf > ga) result = 'team-detail-match--win';
+    else if (gf < ga) result = 'team-detail-match--loss';
+    else result = 'team-detail-match--draw';
+  }
+
+  const venueLabel = isHome ? 'Casa' : 'Fora';
+  const oppHTML = opp
+    ? `<div class="team-name team-detail-match__opp-name">
+        <img class="flag" src="${flagUrl(opp)}" alt="" />
+        ${teamShortLabelHTML(data, oppId)}
+      </div>`
+    : '<span class="team-detail-match__opp-name">—</span>';
+
+  return `<div class="team-detail-match ${result}">
+    <span class="team-detail-match__meta">${formatDateShort(m.date)} · ${phaseLabel(m.phase)}${m.group ? ` · Grp ${m.group}` : ''} · ${venueLabel}</span>
+    <span class="team-detail-match__opp">${oppHTML}</span>
+    <span class="team-detail-match__score">${scoreText}</span>
+    <span class="status-pill status-pill--${m.status}">${statusLabel(m.status)}</span>
+  </div>`;
+}
+
+function teamLineupSubtitle(data, teamId) {
+  const t = data.teamMap[teamId];
+  const formation = t?.probable_formation || '4-4-2';
+  const coach = t?.coach ? ` · ${t.coach}` : '';
+  return `${formation}${coach}`;
+}
+
+export function renderTeamDetail(data, state, teamId, onBack) {
+  const t = data.teamMap[teamId];
+  if (!t) {
+    onBack?.();
+    return;
+  }
+
+  const listPanel = document.getElementById('teams-list-panel');
+  const detailPanel = document.getElementById('team-detail-panel');
+  if (listPanel) listPanel.hidden = true;
+  if (detailPanel) detailPanel.hidden = false;
+
+  const stats = teamDetailedStats(teamId, data);
+
+  detailPanel.innerHTML = `
+    <div class="team-detail">
+      <button type="button" class="btn btn--ghost btn--sm team-detail__back" id="team-detail-back">← Voltar às seleções</button>
+
+      <header class="team-detail__hero">
+        <img class="team-detail__flag" src="${flagUrl(t)}" alt="" />
+        <div class="team-detail__hero-text">
+          <h1>${t.name}</h1>
+          <p class="team-detail__subtitle">
+            Grupo ${t.group} · ${t.confederation}
+            ${stats.groupPos ? ` · ${stats.groupPos}º no grupo` : ''}
+          </p>
+        </div>
+      </header>
+
+      <div class="team-detail-kpis">
+        <div class="team-detail-kpi"><span class="team-detail-kpi__val">${stats.pts}</span><span class="team-detail-kpi__lbl">Pts</span></div>
+        <div class="team-detail-kpi"><span class="team-detail-kpi__val">${stats.played}</span><span class="team-detail-kpi__lbl">Jogos</span></div>
+        <div class="team-detail-kpi"><span class="team-detail-kpi__val">${stats.won}-${stats.drawn}-${stats.lost}</span><span class="team-detail-kpi__lbl">V-E-D</span></div>
+        <div class="team-detail-kpi"><span class="team-detail-kpi__val">${stats.gf}</span><span class="team-detail-kpi__lbl">Gols</span></div>
+        <div class="team-detail-kpi"><span class="team-detail-kpi__val">${stats.ga}</span><span class="team-detail-kpi__lbl">Sofridos</span></div>
+        <div class="team-detail-kpi"><span class="team-detail-kpi__val">${stats.gd > 0 ? '+' + stats.gd : stats.gd}</span><span class="team-detail-kpi__lbl">Saldo</span></div>
+        <div class="team-detail-kpi"><span class="team-detail-kpi__val">${stats.aproveitamento}%</span><span class="team-detail-kpi__lbl">Aprov.</span></div>
+        <div class="team-detail-kpi"><span class="team-detail-kpi__val">${stats.cleanSheets}</span><span class="team-detail-kpi__lbl">Clean sheets</span></div>
+      </div>
+
+      <div class="team-detail-ranks card">
+        <div class="card__header"><h2>Comparativo no torneio</h2></div>
+        <div class="card__body team-detail-ranks__grid">
+          <div><span class="team-detail-ranks__label">Pontos</span><strong>${rankLabel(stats.ranks.pts, stats.ranks.total)}</strong></div>
+          <div><span class="team-detail-ranks__label">Ataque (gols)</span><strong>${rankLabel(stats.ranks.gf, stats.ranks.total)}</strong></div>
+          <div><span class="team-detail-ranks__label">Defesa (sofridos)</span><strong>${rankLabel(stats.ranks.ga, stats.ranks.total)}</strong></div>
+          <div><span class="team-detail-ranks__label">Saldo de gols</span><strong>${rankLabel(stats.ranks.gd, stats.ranks.total)}</strong></div>
+          <div><span class="team-detail-ranks__label">Média gols/jogo</span><strong>${stats.avgGF}</strong></div>
+          <div><span class="team-detail-ranks__label">Média sofridos/jogo</span><strong>${stats.avgGA}</strong></div>
+        </div>
+      </div>
+
+      <div class="team-detail-charts charts-grid">
+        <article class="card card--wide team-detail-lineup-card">
+          <div class="card__header">
+            <h2>Escalação provável</h2>
+            <span class="card__subtitle">${teamLineupSubtitle(data, teamId)}</span>
+          </div>
+          <div class="card__body">
+            ${renderTeamLineupInfographic(data, teamId)}
+          </div>
+        </article>
+        <article class="card"><div class="card__header"><h2>Gols por fase</h2></div><div class="card__body chart-wrap"><canvas id="team-chart-goals-phase"></canvas></div></article>
+        <article class="card"><div class="card__header"><h2>Distribuição de resultados</h2></div><div class="card__body chart-wrap"><canvas id="team-chart-results"></canvas></div></article>
+        <article class="card card--wide"><div class="card__header"><h2>vs média do torneio</h2></div><div class="card__body chart-wrap"><canvas id="team-chart-compare"></canvas></div></article>
+      </div>
+
+      <div class="team-detail-grid">
+        <article class="card">
+          <div class="card__header"><h2>Classificação — Grupo ${t.group}</h2></div>
+          <div class="card__body">
+            <table class="standings standings--compact-names">
+              <thead><tr><th>Seleção</th><th>P</th><th>J</th><th>SG</th><th>Pts</th></tr></thead>
+              <tbody>
+                ${stats.standings.map((s, i) => `<tr class="${s.code === teamId ? 'qualified' : ''}">
+                  <td><div class="team-name"><img class="flag" src="${flagUrl(data.teamMap[s.code])}" alt="" />${teamShortLabelHTML(data, s.code)}</div></td>
+                  <td>${i + 1}º</td><td>${s.played}</td><td>${s.gd > 0 ? '+' + s.gd : s.gd}</td><td><span class="standings__pts">${s.pts}</span></td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card__header"><h2>Artilheiros</h2></div>
+          <div class="card__body">
+            ${teamScorersBlockHTML(data, teamId, stats.gf)}
+          </div>
+        </article>
+      </div>
+
+      <article class="card">
+        <div class="card__header"><h2>Jogos da seleção</h2></div>
+        <div class="card__body team-detail-matches">
+          ${stats.teamMatches.length
+            ? stats.teamMatches.map((m) => teamDetailMatchHTML(data, m, teamId)).join('')
+            : '<div class="empty">Nenhum jogo encontrado</div>'}
+        </div>
+      </article>
+    </div>`;
+
+  document.getElementById('team-detail-back')?.addEventListener('click', () => onBack?.());
+  bindLineupPlayerTooltips(detailPanel);
 }
 
 export function renderCompare(data, idA, idB) {
@@ -539,35 +785,8 @@ export function renderCompare(data, idA, idB) {
     </div>`;
 }
 
-export function renderTeamModal(data, teamId) {
-  const t = data.teamMap[teamId];
-  const s = teamStats(teamId, data.matches);
-  const standings = computeGroupStandings(t.group, data.matches, data.groups.find((g) => g.id === t.group).teams);
-  const pos = standings.findIndex((x) => x.code === teamId) + 1;
-  const teamMatches = data.matches.filter((m) => m.home === teamId || m.away === teamId)
-    .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
-  const upcoming = teamMatches.filter((m) => m.status === 'scheduled').reverse();
-  const past = teamMatches.filter((m) => m.status === 'finished');
-
-  document.getElementById('modal-team-name').textContent = t.name;
-  document.getElementById('modal-team-body').innerHTML = `
-    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
-      <img src="${flagUrl(t)}" style="width:56px;height:38px;border-radius:4px" alt="" />
-      <div>
-        <div>Grupo ${t.group} · ${pos}º lugar · ${t.confederation}</div>
-        <div style="color:var(--text-muted);font-size:0.85rem">${s.played} jogos · ${s.pts} pts · SG ${s.gd > 0 ? '+' + s.gd : s.gd}</div>
-      </div>
-    </div>
-    <div class="modal-section"><h4>Próximos jogos</h4>
-      ${upcoming.length ? upcoming.slice(0, 3).map((m) => matchRowHTML(data, m, { search: '', favorites: [] }, true)).join('') : '<div class="empty" style="padding:0.5rem">Sem jogos pendentes</div>'}
-    </div>
-    <div class="modal-section"><h4>Últimos jogos</h4>
-      ${past.length ? past.slice(0, 3).map((m) => matchRowHTML(data, m, { search: '', favorites: [] }, true)).join('') : '<div class="empty" style="padding:0.5rem">Sem resultados</div>'}
-    </div>`;
-}
-
 export function renderCalendar(data, state, onEditMatch) {
-  const matches = filterMatches(data.matches, { ...state.matchFilters, search: state.search, phase: 'all', group: 'all', team: 'all', status: 'all', date: '' });
+  const matches = filterMatches(data.matches, { ...state.matchFilters, search: state.search, phase: 'all', group: 'all', team: 'all', status: 'all', date: '' }, data.teamMap);
   const byDate = {};
   matches.forEach((m) => { (byDate[m.date] ??= []).push(m); });
 
@@ -606,6 +825,43 @@ export function renderPerformanceRanking(data) {
     </table>`;
 }
 
+export function renderTopScorersRanking(data) {
+  const el = document.getElementById('top-scorers-ranking');
+  if (!el) return;
+
+  const scorers = normalizeScorers(data.stats?.topScorers ?? [])
+    .filter((s) => s.goals > 0 || s.assists > 0);
+
+  if (!scorers.length) {
+    el.innerHTML = '<div class="empty">Nenhum gol registrado ainda</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <table class="standings standings--compact-names">
+      <thead>
+        <tr><th>#</th><th>Jogador</th><th>Seleção</th><th>Gols</th><th>Assist.</th></tr>
+      </thead>
+      <tbody>
+        ${scorers.map((s, i) => {
+          const team = data.teamMap[s.team];
+          return `<tr>
+            <td>${i + 1}</td>
+            <td><strong>${s.player}</strong></td>
+            <td>
+              <div class="team-name">
+                ${team ? `<img class="flag" src="${flagUrl(team)}" alt="" />` : ''}
+                ${teamShortLabelHTML(data, s.team)}
+              </div>
+            </td>
+            <td><span class="standings__pts">${s.goals}</span></td>
+            <td>${s.assists || '–'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
 function bindFavButtons(root, state, callback) {
   root.querySelectorAll('[data-fav]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
@@ -626,5 +882,23 @@ export function bindOverviewFavs(state, callback) {
 }
 
 export function updatePhaseBadge(text) {
-  document.getElementById('phase-badge').textContent = text;
+  const el = document.getElementById('status-phase-text');
+  if (el) el.textContent = text;
+}
+
+export function renderPool() {
+  const el = document.getElementById('pool-content');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="pool-placeholder">
+      <div class="pool-placeholder__icon" aria-hidden="true">🎯</div>
+      <h2>Bolão Copa 2026</h2>
+      <p>Em breve você poderá criar palpites, acompanhar sua pontuação e competir com amigos.</p>
+      <ul class="pool-placeholder__list">
+        <li>Palpites por rodada</li>
+        <li>Ranking entre participantes</li>
+        <li>Comparativo com resultados reais</li>
+      </ul>
+      <p class="pool-placeholder__note">Enquanto isso, use o <strong>modo Simulação</strong> para testar cenários.</p>
+    </div>`;
 }

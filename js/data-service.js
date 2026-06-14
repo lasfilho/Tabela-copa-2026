@@ -25,6 +25,7 @@ export async function loadData(mode = 'real') {
     preferences: { theme: 'dark', favorites: [], expandedGroups: [], activeMode: 'real' },
     mode,
     offline: true,
+    user: null,
   };
 }
 

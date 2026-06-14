@@ -1,7 +1,7 @@
 /**
  * Gráficos Chart.js — destrói instâncias anteriores ao re-renderizar.
  */
-import { aggregateStats, phaseLabel } from './engine.js';
+import { aggregateStats } from './engine.js';
 
 const instances = {};
 
@@ -39,39 +39,128 @@ function baseOptions(c) {
   };
 }
 
+function horizontalBarOptions(c) {
+  return {
+    ...baseOptions(c),
+    indexAxis: 'y',
+    scales: {
+      x: { ticks: { color: c.muted }, grid: { color: c.grid }, beginAtZero: true },
+      y: { ticks: { color: c.muted, font: { size: 11 } }, grid: { display: false } },
+    },
+  };
+}
+
 export function renderCharts(data) {
   destroyAll();
   const agg = aggregateStats(data);
   const c = chartColors();
 
-  // Gols por fase
-  const phases = Object.keys(agg.goalsByPhase).filter((p) => agg.goalsByPhase[p] > 0 || p === 'group');
-  instances.goalsPhase = new Chart(document.getElementById('chart-goals-phase'), {
-    type: 'bar',
-    data: {
-      labels: phases.map(phaseLabel),
-      datasets: [{ label: 'Gols', data: phases.map((p) => agg.goalsByPhase[p]), backgroundColor: c.accent, borderRadius: 6 }],
-    },
-    options: baseOptions(c),
-  });
+  // Aproveitamento por seleção (top 8)
+  const aprovEl = document.getElementById('chart-aproveitamento');
+  if (aprovEl && agg.topAproveitamento.length) {
+    instances.aproveitamento = new Chart(aprovEl, {
+      type: 'bar',
+      data: {
+        labels: agg.topAproveitamento.map((t) => t.name),
+        datasets: [{
+          label: 'Aproveitamento (%)',
+          data: agg.topAproveitamento.map((t) => t.aproveitamento),
+          backgroundColor: c.accent,
+          borderRadius: 6,
+        }],
+      },
+      options: {
+        ...horizontalBarOptions(c),
+        scales: {
+          ...horizontalBarOptions(c).scales,
+          x: { ...horizontalBarOptions(c).scales.x, max: 100 },
+        },
+      },
+    });
+  }
 
-  // Distribuição resultados
-  instances.results = new Chart(document.getElementById('chart-results'), {
-    type: 'doughnut',
-    data: {
-      labels: ['Vitórias (total)', 'Empates', 'Derrotas (total)'],
-      datasets: [{
-        data: [agg.wins, agg.draws, agg.losses],
-        backgroundColor: [c.accent, c.gold, c.accent2],
-        borderWidth: 0,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { color: c.text } } },
-    },
-  });
+  // Saldo de gols por seleção (top 8)
+  const gdEl = document.getElementById('chart-goal-diff');
+  if (gdEl && agg.topGoalDifference.length) {
+    instances.goalDiff = new Chart(gdEl, {
+      type: 'bar',
+      data: {
+        labels: agg.topGoalDifference.map((t) => t.name),
+        datasets: [{
+          label: 'Saldo de gols',
+          data: agg.topGoalDifference.map((t) => t.gd),
+          backgroundColor: agg.topGoalDifference.map((t) => (t.gd >= 0 ? c.accent : c.accent2)),
+          borderRadius: 6,
+        }],
+      },
+      options: horizontalBarOptions(c),
+    });
+  }
+
+  // V-E-D por seleção (empilhado — compara seleções, não o torneio agregado)
+  const vedEl = document.getElementById('chart-results-teams');
+  if (vedEl && agg.resultsBreakdown.length) {
+    instances.resultsTeams = new Chart(vedEl, {
+      type: 'bar',
+      data: {
+        labels: agg.resultsBreakdown.map((t) => t.name),
+        datasets: [
+          {
+            label: 'Vitórias',
+            data: agg.resultsBreakdown.map((t) => t.won),
+            backgroundColor: c.accent,
+            borderRadius: 4,
+          },
+          {
+            label: 'Empates',
+            data: agg.resultsBreakdown.map((t) => t.drawn),
+            backgroundColor: c.gold,
+            borderRadius: 4,
+          },
+          {
+            label: 'Derrotas',
+            data: agg.resultsBreakdown.map((t) => t.lost),
+            backgroundColor: c.accent2,
+            borderRadius: 4,
+          },
+        ],
+      },
+      options: {
+        ...horizontalBarOptions(c),
+        scales: {
+          ...horizontalBarOptions(c).scales,
+          x: { ...horizontalBarOptions(c).scales.x, stacked: true },
+          y: { ...horizontalBarOptions(c).scales.y, stacked: true },
+        },
+      },
+    });
+  }
+
+  // Desempenho médio por confederação
+  const confEl = document.getElementById('chart-confederation');
+  if (confEl && agg.confederationStats.length) {
+    instances.confederation = new Chart(confEl, {
+      type: 'bar',
+      data: {
+        labels: agg.confederationStats.map((row) => row.confederation),
+        datasets: [
+          {
+            label: 'Pts/jogo (média)',
+            data: agg.confederationStats.map((row) => Number(row.avgPts.toFixed(2))),
+            backgroundColor: c.accent,
+            borderRadius: 6,
+          },
+          {
+            label: 'Gols/jogo (média)',
+            data: agg.confederationStats.map((row) => Number(row.avgGF.toFixed(2))),
+            backgroundColor: c.accent2,
+            borderRadius: 6,
+          },
+        ],
+      },
+      options: baseOptions(c),
+    });
+  }
 
   // Melhor ataque
   instances.attack = new Chart(document.getElementById('chart-attack'), {

@@ -2,22 +2,27 @@
  * Orquestrador — modos Real/Simulação com persistência PostgreSQL.
  */
 import { loadData } from './data-service.js';
-import { computeKPIs, filterMatches } from './engine.js';
+import { computeKPIs, filterMatches, getStatusPhaseLabel } from './engine.js';
 import { renderCharts } from './charts.js';
 import { resolveKnockoutBracket } from './knockout-resolver.js';
 import { applyStatuses } from './match-status.js';
 import {
-  saveMatchScore, clearAllScores, savePreferences,
+  saveMatchScore, savePreferences, clearAllScores,
   fetchSyncStatus, toggleScoreSync, runScoreSyncNow,
 } from './api-client.js';
+import { fetchCurrentUser, getStoredUser, getToken, logout } from './auth-client.js';
+import { buildPermissions } from './permissions.js';
 import {
   renderKPIs, renderCountdown, renderOverview, renderGroups,
   renderGroupsFilters, renderMatchesFilters, renderMatchesTable, renderKnockout,
-  renderTeams, renderCompare, renderTeamModal, renderCalendar,
-  renderPerformanceRanking, setFavToggleHandler, bindOverviewFavs,
+  renderTeams, renderCompare, renderTeamDetail, renderCalendar,
+  renderPerformanceRanking, renderTopScorersRanking, setFavToggleHandler, bindOverviewFavs,
   updatePhaseBadge, setScoreSaveHandler, bindScoreEditors, updateModeUI,
-  openScoreModal,
+  openScoreModal, setPermissions,
 } from './views.js';
+import { renderTeamDetailCharts, destroyTeamCharts } from './team-charts.js';
+import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js';
+import { renderAdminSettings, initAdminSettingsUI } from './admin-settings.js';
 
 const STORAGE_KEY = 'copa2026-ui-cache';
 
@@ -33,7 +38,10 @@ const state = {
   groupFilter: 'all',
   groupFavsOnly: false,
   matchFilters: { phase: 'all', group: 'all', team: 'all', date: '', status: 'all' },
+  selectedTeamId: null,
   offline: false,
+  user: null,
+  permissions: buildPermissions(null, 'real'),
 };
 
 let baseData = null;
@@ -46,8 +54,16 @@ let lastSyncOkAt = null;
 
 async function init() {
   loadLocalUI();
+  syncBodyLayoutState();
   applyTheme();
   applySidebarLayout();
+
+  state.user = getStoredUser();
+  try {
+    const refreshed = await fetchCurrentUser();
+    if (refreshed) state.user = refreshed;
+  } catch { /* mantém usuário do localStorage se /me falhar */ }
+  applyPermissions();
 
   try {
     await reloadData();
@@ -64,13 +80,72 @@ async function init() {
 
   initNavigation();
   initUI();
+  initAuthUI();
+  initAdminUI();
   initScoreSync();
   startLiveStatusTicker();
   navigate(state.section);
 }
 
+function applyPermissions() {
+  if (!state.user && (state.mode === 'simulation' || state.mode === 'pool')) {
+    state.mode = 'real';
+  }
+  state.permissions = buildPermissions(state.user, state.mode);
+  setPermissions(state.user, state.mode);
+  applyAuthUI();
+  updateModeUI(state.mode);
+}
+
+function applyAuthUI() {
+  const p = state.permissions;
+  document.querySelectorAll('.mode-btn--auth').forEach((btn) => {
+    btn.hidden = !p.canAccessSimulation;
+  });
+
+  document.getElementById('auth-access-btn').hidden = p.isLoggedIn;
+  document.getElementById('auth-logout-btn').hidden = !p.isLoggedIn;
+  const userWrap = document.getElementById('sidebar-user-wrap');
+  const userLabel = document.getElementById('auth-user-label');
+  if (p.isLoggedIn) {
+    userWrap.hidden = false;
+    userLabel.textContent = p.isAdmin ? `${state.user.name} (admin)` : state.user.name;
+    userLabel.title = userLabel.textContent;
+  } else {
+    userWrap.hidden = true;
+    userLabel.textContent = '';
+    userLabel.title = '';
+  }
+
+  document.querySelectorAll('.admin-only').forEach((el) => {
+    el.hidden = !p.canManageSync;
+  });
+
+  document.querySelectorAll('.admin-only-nav').forEach((el) => {
+    el.hidden = !p.canAccessAdminSettings;
+  });
+
+  updateSimActionButtons();
+}
+
+function updateSimActionButtons() {
+  const visible = state.mode === 'simulation' && state.permissions.canEditScores;
+  document.getElementById('sim-test-fill-btn')?.toggleAttribute('hidden', !visible);
+  document.getElementById('sim-clear-btn')?.toggleAttribute('hidden', !visible);
+}
+
+function initAuthUI() {
+  document.getElementById('auth-logout-btn')?.addEventListener('click', logout);
+}
+
 async function reloadData() {
-  const bundle = await loadData(state.mode);
+  const loadMode = state.mode === 'pool' ? 'real' : state.mode;
+  const bundle = await loadData(loadMode);
+  if (bundle.user) {
+    state.user = bundle.user;
+  } else if (!getToken()) {
+    state.user = null;
+  }
   baseData = {
     tournament: bundle.tournament,
     teams: bundle.teams,
@@ -87,10 +162,12 @@ async function reloadData() {
   }
 
   refreshComputedData();
+  applyPermissions();
 }
 
 function refreshComputedData() {
-  baseData.matches = applyStatuses(baseData.matches);
+  const statusMode = state.mode === 'pool' ? 'real' : state.mode;
+  baseData.matches = applyStatuses(baseData.matches, new Date(), statusMode);
   const matches = resolveKnockoutBracket({ ...baseData, matches: baseData.matches.map((m) => ({ ...m })) });
   data = { ...baseData, matches };
 }
@@ -100,6 +177,7 @@ function startLiveStatusTicker() {
   liveStatusTimer = setInterval(() => {
     if (!baseData) return;
     refreshComputedData();
+    if (state.mode === 'pool') return;
     renderAll();
   }, 30000);
 }
@@ -109,6 +187,9 @@ function loadLocalUI() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     state.theme = saved.theme ?? 'dark';
     state.mode = saved.mode ?? 'real';
+    if (saved.mode === 'simulation' || saved.mode === 'pool') {
+      state.mode = 'real';
+    }
     state.section = location.hash.replace('#', '') || saved.section || 'overview';
     state.sidebarCollapsed = saved.sidebarCollapsed ?? false;
   } catch { /* ignore */ }
@@ -142,20 +223,136 @@ function applyTheme() {
   document.querySelector('.theme-toggle__icon').textContent = state.theme === 'dark' ? '☀' : '🌙';
 }
 
-async function setMode(mode) {
-  state.mode = mode;
-  applyTheme();
-  updateModeUI(mode);
-  saveLocalUI();
-  await reloadData();
-  renderAll();
-  schedulePrefsSave();
-  showToast(mode === 'real' ? 'Modo Real — dados do PostgreSQL' : 'Modo Simulação — cenários separados');
+let poolUIReady = false;
+let adminUIReady = false;
+
+function ensurePoolUI() {
+  const container = document.getElementById('pool-content');
+  if (!container || poolUIReady) return;
+  initPoolUI(container, {
+    teamMap: data?.teamMap ?? {},
+    showToast,
+    currentUser: state.user,
+  });
+  poolUIReady = true;
 }
 
-async function persistMatchScore(matchId, homeRaw, awayRaw) {
+async function showPoolView() {
+  ensurePoolUI();
+  resetPoolUI();
+  document.querySelectorAll('.view').forEach((v) => {
+    v.hidden = true;
+    v.classList.remove('active');
+  });
+  const pool = document.getElementById('view-pool');
+  pool.hidden = false;
+  pool.classList.add('active');
+  await renderPoolApp(document.getElementById('pool-content'), {
+    teamMap: data?.teamMap ?? {},
+    showToast,
+    currentUser: state.user,
+  });
+}
+async function setMode(mode) {
+  if ((mode === 'simulation' || mode === 'pool') && !state.permissions.canAccessSimulation) {
+    showToast('Faça login para acessar Simulação e Bolão');
+    window.location.href = '/auth.html';
+    return;
+  }
+
+  state.mode = mode;
+  applyPermissions();
+  syncBodyLayoutState();
+  applyTheme();
+  updateModeUI(mode);
+
+  if (mode === 'pool') {
+    saveLocalUI();
+    await showPoolView();
+    return;
+  }
+
+  saveLocalUI();
+  await reloadData();
+  navigate(state.section);
+  schedulePrefsSave();
+  showToast(mode === 'real' ? 'Modo Real — visualização' : 'Modo Simulação — edite placares');
+}
+
+async function clearSimulationScores() {
+  if (state.mode !== 'simulation' || !state.permissions.canEditScores) return;
   if (state.offline) {
     showToast('API offline — inicie o Docker');
+    return;
+  }
+
+  const finished = data?.matches?.filter((m) => m.status === 'finished').length ?? 0;
+  if (!finished) {
+    showToast('Não há placares na simulação para limpar');
+    return;
+  }
+
+  if (!window.confirm(`Apagar todos os ${finished} placar(es) da simulação? Esta ação não afeta o modo Real.`)) {
+    return;
+  }
+
+  const btn = document.getElementById('sim-clear-btn');
+  if (btn) btn.disabled = true;
+
+  try {
+    await clearAllScores('simulation');
+    await reloadData();
+    renderAll();
+    showToast('Simulação reiniciada — todos os placares foram removidos');
+  } catch (err) {
+    showToast(err.message || 'Erro ao limpar simulação');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function fillGroupTestScores() {
+  if (state.mode !== 'simulation' || !state.permissions.canEditScores) return;
+  if (state.offline) {
+    showToast('API offline — inicie o Docker');
+    return;
+  }
+  if (!data?.matches?.length) return;
+
+  const groupMatches = data.matches.filter((m) => m.phase === 'group');
+  if (!groupMatches.length) {
+    showToast('Nenhum jogo de fase de grupos encontrado');
+    return;
+  }
+
+  const btn = document.getElementById('sim-test-fill-btn');
+  if (btn) btn.disabled = true;
+  showToast(`Gerando ${groupMatches.length} placares aleatórios...`);
+
+  try {
+    await Promise.all(groupMatches.map((m) => {
+      const home = Math.floor(Math.random() * 5);
+      const away = Math.floor(Math.random() * 5);
+      return saveMatchScore('simulation', m.id, home, away);
+    }));
+    await reloadData();
+    renderAll();
+    showToast('Placares de teste da fase de grupos aplicados');
+  } catch (err) {
+    showToast(err.message || 'Erro ao gerar placares de teste');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function persistMatchScore(matchId, homeRaw, awayRaw, options = {}) {
+  const { quiet = false } = options;
+  if (!state.permissions.canEditScores) {
+    if (!quiet) showToast('Somente leitura neste modo');
+    return;
+  }
+  if (state.offline) {
+    if (!quiet) showToast('API offline — inicie o Docker');
     return;
   }
 
@@ -163,7 +360,7 @@ async function persistMatchScore(matchId, homeRaw, awayRaw) {
     await saveMatchScore(state.mode, matchId, homeRaw, awayRaw);
     await reloadData();
     renderAll();
-    showToast('Placar salvo no banco de dados');
+    if (!quiet) showToast('Placar salvo no banco de dados');
   } catch (err) {
     showToast(err.message);
   }
@@ -201,26 +398,19 @@ function applySidebarLayout() {
 function updateSidebarToggleLabels() {
   const collapsed = document.body.classList.contains('sidebar-collapsed');
   const mobile = isMobileSidebar();
-  const menuBtn = document.getElementById('menu-btn');
   const collapseBtn = document.getElementById('sidebar-collapse-btn');
 
-  if (menuBtn) {
+  if (collapseBtn) {
     if (mobile) {
       const open = document.body.classList.contains('sidebar-open');
-      menuBtn.setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu');
-      menuBtn.title = open ? 'Fechar menu' : 'Abrir menu';
+      collapseBtn.setAttribute('aria-expanded', String(open));
+      collapseBtn.setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu');
+      collapseBtn.title = open ? 'Fechar menu' : 'Abrir menu';
     } else {
-      menuBtn.setAttribute('aria-label', collapsed ? 'Expandir menu' : 'Retrair menu');
-      menuBtn.title = collapsed ? 'Expandir menu' : 'Retrair menu';
+      collapseBtn.setAttribute('aria-expanded', String(!collapsed));
+      collapseBtn.setAttribute('aria-label', collapsed ? 'Expandir menu' : 'Retrair menu');
+      collapseBtn.title = collapsed ? 'Expandir menu' : 'Retrair menu';
     }
-  }
-
-  if (collapseBtn) {
-    collapseBtn.setAttribute('aria-expanded', String(!collapsed));
-    collapseBtn.setAttribute('aria-label', collapsed ? 'Expandir menu' : 'Retrair menu');
-    collapseBtn.title = collapsed ? 'Expandir menu' : 'Retrair menu';
-    const label = collapseBtn.querySelector('.nav-label');
-    if (label) label.textContent = collapsed ? 'Expandir menu' : 'Retrair menu';
   }
 }
 
@@ -233,11 +423,32 @@ function toggleSidebar() {
   }
 }
 
+function initAdminUI() {
+  const container = document.getElementById('settings-content');
+  if (!container || adminUIReady) return;
+  initAdminSettingsUI(container, { showToast });
+  adminUIReady = true;
+}
+
 function initNavigation() {
-  document.querySelectorAll('.nav-link').forEach((link) => {
-    link.addEventListener('click', (e) => {
+  document.querySelectorAll('.nav-link[data-section]').forEach((link) => {
+    link.addEventListener('click', async (e) => {
       e.preventDefault();
-      navigate(link.dataset.section);
+      const section = link.dataset.section;
+      if (!section) return;
+      if (state.mode === 'pool') {
+        state.mode = 'real';
+        applyPermissions();
+        applyTheme();
+        updateModeUI('real');
+        await reloadData();
+      }
+      if (section === 'settings' && !state.permissions.canAccessAdminSettings) {
+        showToast('Acesso restrito a administradores');
+        return;
+      }
+      if (section === 'teams') state.selectedTeamId = null;
+      navigate(section);
       if (isMobileSidebar()) setSidebarOpen(false);
     });
   });
@@ -249,8 +460,22 @@ function initNavigation() {
 }
 
 function navigate(section, pushHash = true) {
+  if (state.mode === 'pool') return;
+
+  if (section === 'settings' && !state.permissions.canAccessAdminSettings) {
+    section = 'overview';
+  }
+
+  if (section !== 'teams') {
+    state.selectedTeamId = null;
+    destroyTeamCharts();
+  }
+
   state.section = section;
   if (pushHash) history.replaceState(null, '', `#${section}`);
+
+  syncBodyLayoutState();
+  updateStatusBarVisibility();
 
   document.querySelectorAll('.nav-link').forEach((l) => {
     l.classList.toggle('active', l.dataset.section === section);
@@ -275,34 +500,45 @@ function formatSyncTime(iso) {
   }
 }
 
+function syncBodyLayoutState() {
+  document.body.dataset.section = state.mode === 'pool' ? 'pool' : state.section;
+}
+
+function updateStatusBarVisibility() {
+  syncBodyLayoutState();
+  const bar = document.getElementById('status-bar');
+  if (!bar) return;
+  const show = state.mode !== 'pool' && (state.section === 'overview' || state.section === 'matches');
+  bar.hidden = !show;
+}
+
 function updateSyncUI(status) {
   const toggle = document.getElementById('sync-toggle');
   const label = document.getElementById('sync-toggle-label');
-  const banner = document.getElementById('sync-banner');
-  const bannerText = document.getElementById('sync-banner-text');
-  if (!toggle || !label || !banner || !bannerText) return;
+  const statusBar = document.getElementById('status-bar');
+  const statusText = document.getElementById('sync-status-text');
+  if (!toggle || !statusBar || !statusText) return;
 
   state.syncEnabled = Boolean(status?.enabled);
   toggle.classList.toggle('active', state.syncEnabled);
-  label.textContent = state.syncEnabled ? 'Sync on' : 'Sync off';
+  const syncLabel = state.syncEnabled ? 'Sync ligado' : 'Sync desligado';
+  if (label) label.textContent = syncLabel;
+  toggle.setAttribute('aria-label', syncLabel);
   toggle.title = state.syncEnabled
-    ? 'Desligar sync (placares parciais e finais)'
-    : 'Ligar sync automático — parciais quando a API enviar (TheSportsDB)';
+    ? 'Desligar sync automático (TheSportsDB)'
+    : 'Ligar sync automático — placares parciais e finais (TheSportsDB)';
 
-  banner.hidden = false;
-  banner.classList.remove('sync-banner--on', 'sync-banner--off', 'sync-banner--error');
+  statusBar.classList.remove('status-bar--sync-on', 'status-bar--sync-off', 'status-bar--sync-error');
 
   if (status?.lastError) {
-    banner.classList.add('sync-banner--error');
-    bannerText.textContent = `Erro na sync: ${status.lastError}`;
+    statusBar.classList.add('status-bar--sync-error');
+    statusText.textContent = `Erro na sync: ${status.lastError}`;
   } else if (state.syncEnabled) {
-    banner.classList.add('sync-banner--on');
-    const updated = status.lastUpdated ? ` · ${status.lastUpdated} atualizado(s)` : '';
-    const live = status.lastLive ? ` (${status.lastLive} ao vivo)` : '';
-    bannerText.textContent = `Sync ativo — placares parciais e finais a cada ${status.intervalMinutes ?? 5} min (TheSportsDB) · última: ${formatSyncTime(status.lastOkAt)}${updated}${live}`;
+    statusBar.classList.add('status-bar--sync-on');
+    statusText.textContent = `Sync ativo · última: ${formatSyncTime(status.lastOkAt)}`;
   } else {
-    banner.classList.add('sync-banner--off');
-    bannerText.textContent = 'Sync automático desligado — placares só entram manualmente no modo Real';
+    statusBar.classList.add('status-bar--sync-off');
+    statusText.textContent = 'Sync automático desligado';
   }
 }
 
@@ -315,7 +551,11 @@ async function refreshSyncStatus(reloadIfUpdated = false) {
     updateSyncUI(status);
     if (reloadIfUpdated && status.lastOkAt && status.lastOkAt !== prevOk && status.lastUpdated > 0) {
       await reloadData();
-      renderAll();
+      if (state.mode === 'pool') {
+        updatePoolContext({ teamMap: data?.teamMap ?? {}, showToast, currentUser: state.user });
+      } else {
+        renderAll();
+      }
       showToast(`${status.lastUpdated} placar(es) sincronizado(s) automaticamente`);
     }
   } catch { /* ignore */ }
@@ -327,6 +567,7 @@ function startSyncPoll() {
 }
 
 function initScoreSync() {
+  if (!state.permissions.canManageSync) return;
   refreshSyncStatus(false);
   startSyncPoll();
 
@@ -342,7 +583,11 @@ function initScoreSync() {
       showToast(next ? 'Sync automático ligado' : 'Sync automático desligado');
       if (next && status.lastUpdated > 0) {
         await reloadData();
-        renderAll();
+        if (state.mode === 'pool') {
+          updatePoolContext({ teamMap: data?.teamMap ?? {}, showToast, currentUser: state.user });
+        } else {
+          renderAll();
+        }
       }
     } catch (err) {
       showToast(err.message);
@@ -360,7 +605,11 @@ function initScoreSync() {
       updateSyncUI(result);
       if (result.updated > 0) {
         await reloadData();
-        renderAll();
+        if (state.mode === 'pool') {
+          updatePoolContext({ teamMap: data?.teamMap ?? {}, showToast, currentUser: state.user });
+        } else {
+          renderAll();
+        }
         showToast(`${result.updated} placar(es) atualizado(s)`);
       } else if (result.skipped) {
         showToast('Sync desligada');
@@ -387,15 +636,11 @@ function initUI() {
     if (state.section === 'stats' && chartsRendered) renderCharts(data);
   });
 
-  document.getElementById('menu-btn').addEventListener('click', toggleSidebar);
-
-  document.getElementById('sidebar-collapse-btn')?.addEventListener('click', () => {
-    if (!isMobileSidebar()) setSidebarCollapsed(!state.sidebarCollapsed);
-  });
+  document.getElementById('sidebar-collapse-btn')?.addEventListener('click', toggleSidebar);
 
   document.body.addEventListener('click', (e) => {
     if (!document.body.classList.contains('sidebar-open')) return;
-    if (e.target.closest('#sidebar') || e.target.closest('#menu-btn')) return;
+    if (e.target.closest('#sidebar') || e.target.closest('#sidebar-collapse-btn')) return;
     setSidebarOpen(false);
   });
 
@@ -411,6 +656,7 @@ function initUI() {
 
   document.getElementById('global-search').addEventListener('input', (e) => {
     state.search = e.target.value.trim();
+    if (state.mode === 'pool') return;
     renderAll();
   });
 
@@ -421,18 +667,8 @@ function initUI() {
     });
   });
 
-  document.getElementById('reset-scores-btn').addEventListener('click', async () => {
-    const label = state.mode === 'real' ? 'Real' : 'Simulação';
-    if (!confirm(`Limpar TODOS os placares do modo ${label} no banco de dados?`)) return;
-    try {
-      await clearAllScores(state.mode);
-      await reloadData();
-      renderAll();
-      showToast(`Placares do modo ${label} apagados`);
-    } catch (err) {
-      showToast(err.message);
-    }
-  });
+  document.getElementById('sim-test-fill-btn')?.addEventListener('click', fillGroupTestScores);
+  document.getElementById('sim-clear-btn')?.addEventListener('click', clearSimulationScores);
 
   document.getElementById('export-btn').addEventListener('click', exportCurrent);
 
@@ -457,6 +693,7 @@ function initUI() {
 }
 
 function toggleFavorite(teamId) {
+  if (!state.permissions.canFavorite) return;
   const idx = state.favorites.indexOf(teamId);
   if (idx >= 0) state.favorites.splice(idx, 1);
   else state.favorites.push(teamId);
@@ -474,11 +711,26 @@ function toggleGroupExpand(groupId) {
 }
 
 function renderAll() {
+  if (!baseData) return;
+  refreshComputedData();
   if (!data) return;
+  if (state.mode === 'pool') {
+    updateStatusBarVisibility();
+    updatePoolContext({
+      teamMap: data.teamMap ?? {},
+      showToast,
+      currentUser: state.user,
+    });
+    return;
+  }
 
-  renderKPIs(data, document.getElementById('kpi-strip'));
-  updatePhaseBadge(computeKPIs(data).currentPhase);
-  renderCountdown(data, document.getElementById('next-countdown'));
+  updateStatusBarVisibility();
+  updatePhaseBadge(getStatusPhaseLabel(data.matches, data.tournament));
+
+  if (state.section === 'overview') {
+    renderKPIs(data, document.getElementById('kpi-strip'));
+    renderCountdown(data, document.getElementById('next-countdown'));
+  }
 
   switch (state.section) {
     case 'overview':
@@ -492,36 +744,59 @@ function renderAll() {
     case 'matches':
       renderMatchesFilters(data, state, () => renderMatchesTable(data, state));
       renderMatchesTable(data, state);
-      bindScoreEditors(document.getElementById('matches-table-wrap'), persistMatchScore);
+      bindScoreEditors(document.getElementById('matches-table-wrap'), persistMatchScore, {
+        autoSave: state.mode === 'simulation',
+      });
       break;
     case 'knockout':
       renderKnockout(data, state);
-      bindScoreEditors(document.getElementById('bracket-wrap'), persistMatchScore);
+      bindScoreEditors(document.getElementById('bracket-wrap'), persistMatchScore, {
+        autoSave: state.mode === 'simulation',
+      });
       break;
     case 'teams':
-      renderTeams(data, state, openTeamModal);
+      if (state.selectedTeamId) {
+        renderTeamDetail(data, state, state.selectedTeamId, backToTeamsList);
+        renderTeamDetailCharts(state.selectedTeamId, data);
+      } else {
+        destroyTeamCharts();
+        renderTeams(data, state, openTeamDetail);
+      }
       break;
     case 'stats':
       renderCharts(data);
       renderPerformanceRanking(data);
+      renderTopScorersRanking(data);
       chartsRendered = true;
       break;
     case 'calendar':
       renderCalendar(data, state, openScoreModal);
       break;
+    case 'settings':
+      renderAdminSettings(document.getElementById('settings-content'), {
+        showToast,
+        currentUser: state.user,
+      });
+      break;
   }
 }
 
-function openTeamModal(teamId) {
-  renderTeamModal(data, teamId);
-  document.getElementById('team-modal').showModal();
+function openTeamDetail(teamId) {
+  state.selectedTeamId = teamId;
+  renderAll();
+}
+
+function backToTeamsList() {
+  state.selectedTeamId = null;
+  destroyTeamCharts();
+  renderAll();
 }
 
 async function exportCurrent() {
   const payload = {
     mode: state.mode,
     exportedAt: new Date().toISOString(),
-    matches: filterMatches(data.matches, { ...state.matchFilters, search: state.search }),
+    matches: filterMatches(data.matches, { ...state.matchFilters, search: state.search }, data.teamMap),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');

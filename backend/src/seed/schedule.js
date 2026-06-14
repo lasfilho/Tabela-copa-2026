@@ -198,9 +198,14 @@ export const GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L
 }));
 
 export const TOP_SCORERS = [
-  { player: 'Kylian Mbappé', team: 'FRA', goals: 0, assists: 0 },
-  { player: 'Erling Haaland', team: 'NOR', goals: 0, assists: 0 },
-  { player: 'Lionel Messi', team: 'ARG', goals: 0, assists: 0 },
-  { player: 'Vinícius Júnior', team: 'BRA', goals: 0, assists: 0 },
-  { player: 'Harry Kane', team: 'ENG', goals: 0, assists: 0 },
+  { player: 'Kylian Mbappé', team: 'FRA', goals: 3, assists: 1 },
+  { player: 'Erling Haaland', team: 'NOR', goals: 3, assists: 0 },
+  { player: 'Lionel Messi', team: 'ARG', goals: 2, assists: 2 },
+  { player: 'Vinícius Júnior', team: 'BRA', goals: 2, assists: 1 },
+  { player: 'Harry Kane', team: 'ENG', goals: 2, assists: 0 },
+  { player: 'Lamine Yamal', team: 'ESP', goals: 2, assists: 1 },
+  { player: 'Mohamed Salah', team: 'EGY', goals: 1, assists: 1 },
+  { player: 'Son Heung-min', team: 'KOR', goals: 1, assists: 0 },
+  { player: 'Richarlison', team: 'BRA', goals: 1, assists: 0 },
+  { player: 'Antoine Griezmann', team: 'FRA', goals: 1, assists: 1 },
 ];

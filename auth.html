@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Entrar — Copa 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=6" />
+</head>
+<body class="auth-page">
+  <div class="auth-bg" aria-hidden="true"></div>
+  <main class="auth-card">
+    <a href="/" class="auth-card__back">← Voltar ao dashboard</a>
+    <div class="auth-card__brand">
+      <span class="brand-mark">26</span>
+      <div>
+        <strong>Copa 2026</strong>
+        <span>Acesso ao simulador e bolão</span>
+      </div>
+    </div>
+
+    <div class="auth-tabs" role="tablist">
+      <button type="button" class="auth-tab active" data-tab="login" role="tab">Entrar</button>
+      <button type="button" class="auth-tab" data-tab="register" role="tab">Cadastrar</button>
+    </div>
+
+    <form id="form-login" class="auth-form active" data-panel="login">
+      <label>E-mail<input type="email" name="email" required autocomplete="email" placeholder="seu@email.com" /></label>
+      <label>Senha<input type="password" name="password" required autocomplete="current-password" minlength="6" /></label>
+      <p class="auth-form__error" id="login-error" hidden></p>
+      <button type="submit" class="btn btn--primary auth-form__submit">Entrar</button>
+    </form>
+
+    <form id="form-register" class="auth-form" data-panel="register" hidden>
+      <label>Nome<input type="text" name="name" required autocomplete="name" placeholder="Seu nome" /></label>
+      <label>E-mail<input type="email" name="email" required autocomplete="email" placeholder="seu@email.com" /></label>
+      <label>Senha<input type="password" name="password" required autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres" /></label>
+      <p class="auth-form__error" id="register-error" hidden></p>
+      <button type="submit" class="btn btn--primary auth-form__submit">Criar conta</button>
+    </form>
+
+    <p class="auth-card__hint">Visitantes acessam o dashboard em modo Real somente leitura, sem cadastro.</p>
+  </main>
+  <div class="toast" id="toast" role="status"></div>
+  <script type="module" src="js/auth-page.js"></script>
+</body>
+</html>

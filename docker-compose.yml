@@ -26,7 +26,11 @@ services:
       PORT: 8080
       SYNC_ENABLED: "true"
       SPORTS_API_KEY: "123"
+      # API_FOOTBALL_KEY: "sua-chave-api-sports.io"  # fonte mais completa de artilheiros
       SYNC_INTERVAL_MS: "300000"
+      JWT_SECRET: "altere-em-producao"
+      ADMIN_EMAIL: "admin@copa2026.local"
+      ADMIN_PASSWORD: "admin123"
     ports:
       - "3000:8080"
     depends_on:
