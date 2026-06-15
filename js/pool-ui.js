@@ -7,8 +7,8 @@ import {
   createPoolInvite, fetchPoolInvites, searchPoolInviteUsers, fetchParticipantDetail,
   fetchMyInvites, respondToInvite,
   POOL_DISCLAIMER, statusLabel, visibilityLabel, inviteStatusLabel, formatDate, formatDateShort,
-} from './pool-client.js';
-import { esc, matchTeamsHTML } from './pool-match-display.js';
+} from './pool-client.js?v=22';
+import { esc, matchTeamsHTML } from './pool-match-display.js?v=22';
 
 const state = {
   screen: 'list',
@@ -334,7 +334,11 @@ async function renderDetail(container) {
     return renderList(container);
   }
 
-  const p = state.poolDetail.pool;
+  const p = state.poolDetail?.pool;
+  if (!p?.id) {
+    showToastFn('Bolão não encontrado');
+    return renderList(container);
+  }
   const isCreator = currentUser && p.creatorId === currentUser.id;
 
   container.innerHTML = `${disclaimerHTML()}
@@ -611,6 +615,18 @@ async function renderInvitesList(isLinkPool = false) {
 
 let inviteSearchGen = 0;
 
+async function resolveCreatedPoolId(data, poolName) {
+  const direct = data?.pool?.id ?? data?.poolId;
+  if (direct) return direct;
+  try {
+    const list = await fetchMyPools();
+    const found = (list.items ?? []).find((p) => p.name === poolName);
+    return found?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function bindInviteUserSearch(container) {
   const input = container.querySelector('#pool-invite-user-q');
   const results = container.querySelector('#pool-invite-user-results');
@@ -822,22 +838,23 @@ export function initPoolUI(container, opts = {}) {
       errEl.hidden = true;
       if (submitBtn) submitBtn.disabled = true;
       try {
+        const poolName = String(fd.get('name') ?? '').trim();
         const data = await createPool({
-          name: fd.get('name'),
+          name: poolName,
           description: fd.get('description'),
           visibility: fd.get('visibility'),
           allowPublicListing: fd.get('allowPublicListing') === 'on',
           matchIds: fd.getAll('matchIds'),
           status: 'open',
         });
-        const created = data?.pool;
-        if (!created?.id) {
+        const poolId = await resolveCreatedPoolId(data, poolName);
+        if (!poolId) {
           throw new Error('Bolão criado, mas não foi possível abrir. Veja em Meus bolões.');
         }
         showToastFn('Bolão criado!');
         state.createDraft = null;
         state.screen = 'detail';
-        state.poolId = created.id;
+        state.poolId = poolId;
         state.tab = 'predictions';
         await renderPoolApp(container, poolOpts());
       } catch (err) {

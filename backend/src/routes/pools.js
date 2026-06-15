@@ -48,7 +48,11 @@ router.get('/invites/mine', requireAuth, async (req, res, next) => {
 router.post('/', requireAuth, async (req, res, next) => {
   try {
     const pool = await createPool(req.user.id, req.body);
-    res.status(201).json({ pool, disclaimer: RECREATIONAL_DISCLAIMER });
+    res.status(201).json({
+      pool,
+      poolId: pool?.id ?? null,
+      disclaimer: RECREATIONAL_DISCLAIMER,
+    });
   } catch (err) { handleError(err, res, next); }
 });
 

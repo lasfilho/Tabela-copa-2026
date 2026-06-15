@@ -21,7 +21,7 @@ import {
   openScoreModal, setPermissions,
 } from './views.js';
 import { renderTeamDetailCharts, destroyTeamCharts } from './team-charts.js';
-import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js';
+import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=22';
 import { renderAdminSettings, initAdminSettingsUI } from './admin-settings.js';
 
 const STORAGE_KEY = 'copa2026-ui-cache';

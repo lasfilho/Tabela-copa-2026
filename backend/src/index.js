@@ -23,7 +23,13 @@ app.use('/api/public', publicPoolsRouter);
 app.use('/api', apiRouter);
 
 // Frontend estático (mantém o visual existente)
-app.use(express.static(ROOT));
+app.use(express.static(ROOT, {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.js') || filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 
 app.get('/', (_req, res) => {
   res.sendFile(path.join(ROOT, 'copa-2026-dashboard.html'));

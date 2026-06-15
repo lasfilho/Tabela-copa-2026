@@ -114,6 +114,17 @@ function mapPoolRow(row) {
   };
 }
 
+const POOL_ROW_SQL = `
+  SELECT p.*, u.name AS creator_name,
+         (SELECT COUNT(*)::int FROM pool_participants pp WHERE pp.pool_id = p.id) AS participant_count,
+         (SELECT COUNT(*)::int FROM pool_matches pm WHERE pm.pool_id = p.id) AS match_count
+  FROM pools p JOIN users u ON u.id = p.creator_id WHERE p.id = $1`;
+
+async function queryPoolRow(runQuery, poolId) {
+  const { rows } = await runQuery(POOL_ROW_SQL, [poolId]);
+  return rows[0] ? mapPoolRow(rows[0]) : null;
+}
+
 export async function listPoolsForUser(userId) {
   const { rows } = await query(
     `SELECT p.*, u.name AS creator_name,
@@ -151,14 +162,7 @@ export async function listPublicPools({ page = 1, limit = 20 } = {}) {
 }
 
 export async function getPoolById(id) {
-  const { rows } = await query(
-    `SELECT p.*, u.name AS creator_name,
-            (SELECT COUNT(*)::int FROM pool_participants pp WHERE pp.pool_id = p.id) AS participant_count,
-            (SELECT COUNT(*)::int FROM pool_matches pm WHERE pm.pool_id = p.id) AS match_count
-     FROM pools p JOIN users u ON u.id = p.creator_id WHERE p.id = $1`,
-    [id]
-  );
-  return rows[0] ? mapPoolRow(rows[0]) : null;
+  return queryPoolRow(query, id);
 }
 
 export async function getPoolBySlug(slug) {
@@ -238,8 +242,12 @@ export async function createPool(userId, payload) {
       [poolId, userId, JSON.stringify({ name, matchCount: matchIds.length })]
     );
 
-    return poolId;
-  }).then((poolId) => getPoolById(poolId));
+    const pool = await queryPoolRow((sql, params) => client.query(sql, params), poolId);
+    if (!pool) {
+      throw Object.assign(new Error('Bolão criado, mas falhou ao carregar os dados'), { status: 500 });
+    }
+    return pool;
+  });
 }
 
 export async function updatePool(poolId, userId, payload) {
