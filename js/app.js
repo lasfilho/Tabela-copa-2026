@@ -530,7 +530,11 @@ function updateSyncUI(status) {
 
   statusBar.classList.remove('status-bar--sync-on', 'status-bar--sync-off', 'status-bar--sync-error');
 
-  if (status?.lastError) {
+  if (status?.rateLimited) {
+    statusBar.classList.add('status-bar--sync-on');
+    const until = status.rateLimitedUntil ? formatSyncTime(status.rateLimitedUntil) : 'em breve';
+    statusText.textContent = `Sync pausado — limite temporário da API (retoma ~${until})`;
+  } else if (status?.lastError) {
     statusBar.classList.add('status-bar--sync-error');
     statusText.textContent = `Erro na sync: ${status.lastError}`;
   } else if (state.syncEnabled) {

@@ -2,6 +2,7 @@
  * Busca fotos de jogadores no TheSportsDB com desambiguação por clube.
  */
 import { normalizeTeamName } from './sportsdb-team-map.js';
+import { markSportsDbRateLimited } from './sportsdb-fetch.js';
 
 const DISPLAY_ALIASES = {
   'neymar jr': 'Neymar',
@@ -145,7 +146,10 @@ export async function searchPlayerPhoto(player, options = {}) {
   if (!query) return null;
 
   const { players, rateLimited } = await fetchSearch(query);
-  if (rateLimited) return { rateLimited: true };
+  if (rateLimited) {
+    markSportsDbRateLimited(15);
+    return { rateLimited: true };
+  }
   if (!players.length) return null;
 
   const ranked = players

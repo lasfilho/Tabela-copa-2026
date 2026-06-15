@@ -9,6 +9,7 @@ import { query } from './db.js';
 import { teamIdFromSportsDb } from './sportsdb-team-map.js';
 import { computeProbableStarters } from './probable-xi.js';
 import { enrichPlayersWithPhotos } from './squad-enrichment.js';
+import { fetchSportsDbJson } from './sportsdb-fetch.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIFA_SQUADS_PATH = path.join(__dirname, 'seed/fifa-squads.json');
@@ -65,12 +66,15 @@ function applyPhotoCache(players, cache) {
 export async function syncSportsDbTeamIds() {
   const { apiKey } = config();
   const url = `https://www.thesportsdb.com/api/v1/json/${apiKey}/eventsseason.php?id=${LEAGUE_ID}&s=${SEASON}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(25000) });
-  if (!res.ok) throw new Error(`TheSportsDB teams HTTP ${res.status}`);
-  const data = await res.json();
+  const result = await fetchSportsDbJson(url);
+  if (result.rateLimited) {
+    console.warn('[squad] sportsdb team ids — rate limit (429), ignorando');
+    return 0;
+  }
+  if (!result.ok) throw new Error(result.error);
 
   let updated = 0;
-  for (const ev of data.events ?? []) {
+  for (const ev of result.data.events ?? []) {
     const pairs = [
       [ev.strHomeTeam, ev.idHomeTeam],
       [ev.strAwayTeam, ev.idAwayTeam],

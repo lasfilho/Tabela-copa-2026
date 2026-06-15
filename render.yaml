@@ -35,6 +35,12 @@ services:
       - key: SYNC_ENABLED
         value: "true"
       - key: SYNC_INTERVAL_MS
-        value: "600000"
+        value: "900000"
+      - key: SYNC_STARTUP_DELAY_MS
+        value: "120000"
+      - key: SQUAD_SYNC_SKIP_PHOTOS
+        value: "true"
+      - key: SQUAD_SYNC_DELAY_MS
+        value: "180000"
       - key: SPORTS_API_KEY
         value: "123"

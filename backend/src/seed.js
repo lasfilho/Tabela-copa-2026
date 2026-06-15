@@ -118,15 +118,23 @@ export async function initDatabase() {
   await seedPoolData();
 }
 
-/** Importa elencos sem bloquear o HTTP server (sync demora ~1–2 min). */
+/** Importa elencos sem bloquear o HTTP server. Em produção evita fotos (rate limit). */
 export function scheduleSquadSync() {
-  syncAllSquads()
-    .then((squad) => {
-      console.log(`[squad] ${squad.teams} seleções, ${squad.players} jogadores importados`);
-    })
-    .catch((err) => {
-      console.warn('[squad] falha ao importar elencos —', err.message);
-    });
+  if (process.env.SQUAD_SYNC_ENABLED === 'false') return;
+
+  const delayMs = Number(process.env.SQUAD_SYNC_DELAY_MS || 180000);
+  const skipPhotos = process.env.SQUAD_SYNC_SKIP_PHOTOS === 'true'
+    || process.env.NODE_ENV === 'production';
+
+  setTimeout(() => {
+    syncAllSquads({ skipPhotos })
+      .then((squad) => {
+        console.log(`[squad] ${squad.teams} seleções, ${squad.players} jogadores importados${skipPhotos ? ' (sem fotos)' : ''}`);
+      })
+      .catch((err) => {
+        console.warn('[squad] falha ao importar elencos —', err.message);
+      });
+  }, delayMs);
 }
 
 export { TOURNAMENT } from './seed/schedule.js';

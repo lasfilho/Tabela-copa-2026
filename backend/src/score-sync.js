@@ -9,6 +9,10 @@ import {
   syncMatchGoalsFromEvent,
   shouldResyncMatchGoals,
 } from './goal-sync.js';
+import {
+  fetchSportsDbJson,
+  getSportsDbRateLimitUntil,
+} from './sportsdb-fetch.js';
 
 const LEAGUE_ID = '4429';
 const SEASON = '2026';
@@ -30,6 +34,7 @@ const state = {
   lastSkipped: 0,
   lastLive: 0,
   lastGoalsSynced: 0,
+  rateLimitedUntil: null,
 };
 
 function config() {
@@ -73,10 +78,10 @@ async function ensureSyncPreferenceDefault() {
 async function fetchSeasonEvents() {
   const { apiKey } = config();
   const url = `https://www.thesportsdb.com/api/v1/json/${apiKey}/eventsseason.php?id=${LEAGUE_ID}&s=${SEASON}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(25000) });
-  if (!res.ok) throw new Error(`TheSportsDB HTTP ${res.status}`);
-  const data = await res.json();
-  return data.events ?? [];
+  const result = await fetchSportsDbJson(url);
+  if (result.rateLimited) return { rateLimited: true, events: [] };
+  if (!result.ok) throw new Error(result.error);
+  return { events: result.data.events ?? [] };
 }
 
 async function findMatchId(homeId, awayId) {
@@ -220,7 +225,18 @@ export async function runScoreSync() {
   const unmatched = [];
 
   try {
-    const events = await fetchSeasonEvents();
+    const { rateLimited, events } = await fetchSeasonEvents();
+    if (rateLimited) {
+      state.lastError = null;
+      state.rateLimitedUntil = getSportsDbRateLimitUntil();
+      console.warn('[sync] TheSportsDB rate limit (429) — pausando tentativas por ~15 min');
+      return {
+        ok: true,
+        skipped: true,
+        reason: 'rate_limited',
+        rateLimitedUntil: state.rateLimitedUntil,
+      };
+    }
 
     for (const ev of events) {
       const parsed = parseScorableEvent(ev);
@@ -277,6 +293,7 @@ export async function runScoreSync() {
 
     state.lastOkAt = new Date().toISOString();
     state.lastError = null;
+    state.rateLimitedUntil = null;
     state.lastUpdated = updated;
     state.lastSkipped = skipped;
     state.lastLive = liveCount;
@@ -308,9 +325,11 @@ export async function startScoreSyncWorker() {
   const { intervalMs } = config();
   if (timer) clearInterval(timer);
 
+  const startupDelay = Number(process.env.SYNC_STARTUP_DELAY_MS || 120000);
+
   setTimeout(() => {
     runScoreSync().catch(() => {});
-  }, 15000);
+  }, startupDelay);
 
   timer = setInterval(() => {
     runScoreSync().catch(() => {});
@@ -322,9 +341,12 @@ export async function startScoreSyncWorker() {
 
 export async function getSyncStatus() {
   const enabled = await isSyncEnabled();
+  const rateLimitedUntil = getSportsDbRateLimitUntil() || state.rateLimitedUntil;
   return {
     enabled,
     ...getSyncRuntimeState(),
+    rateLimitedUntil,
+    rateLimited: Boolean(rateLimitedUntil && new Date(rateLimitedUntil) > new Date()),
     intervalMinutes: Math.round(config().intervalMs / 60000),
     source: 'TheSportsDB',
     supportsLive: true,
