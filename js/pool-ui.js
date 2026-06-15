@@ -4,8 +4,9 @@
 import {
   fetchMyPools, checkPoolName, fetchPoolMatchesMeta, createPool, fetchPool, updatePool, deletePool,
   joinPool, fetchPoolPredictions, savePrediction, fetchPoolRanking, fetchPoolRules,
-  createPoolInvite, fetchPoolInvites, fetchParticipantDetail, fetchMyInvites, respondToInvite,
-  POOL_DISCLAIMER, statusLabel, visibilityLabel, formatDate, formatDateShort,
+  createPoolInvite, fetchPoolInvites, searchPoolInviteUsers, fetchParticipantDetail,
+  fetchMyInvites, respondToInvite,
+  POOL_DISCLAIMER, statusLabel, visibilityLabel, inviteStatusLabel, formatDate, formatDateShort,
 } from './pool-client.js';
 import { esc, matchTeamsHTML } from './pool-match-display.js';
 
@@ -144,8 +145,9 @@ async function renderList(container) {
       invitesHTML = `<section class="card pool-invites-pending">
         <h3>Convites pendentes</h3>
         <ul>${invites.map((i) => `<li>
-          <strong>${esc(i.pool_name)}</strong>
+          <span><strong>${esc(i.pool_name)}</strong> — convite para participar</span>
           <button type="button" class="btn btn--sm btn--primary" data-accept-invite="${i.id}">Aceitar</button>
+          <button type="button" class="btn btn--sm btn--ghost" data-decline-invite="${i.id}">Recusar</button>
         </li>`).join('')}</ul>
       </section>`;
     }
@@ -258,7 +260,7 @@ async function renderCreate(container) {
   container.innerHTML = `${disclaimerHTML()}${poolTabsHTML('create')}
     <form id="pool-create-form" class="pool-form card">
       <h2>Criar bolão</h2>
-      <p class="pool-form__hint">Crie até o dia anterior à primeira partida. Horários em Brasília (BRT).</p>
+      <p class="pool-form__hint">Crie o bolão até 1 hora antes da primeira partida. Horários em Brasília (BRT).</p>
       <div class="pool-form__creator">
         <span class="pool-form__creator-label">Criador do bolão</span>
         <strong>${esc(creatorName)}</strong>
@@ -280,7 +282,7 @@ async function renderCreate(container) {
       </label>
       <fieldset class="pool-matches-select">
         <legend>Partidas do bolão *</legend>
-        <p class="pool-form__hint">${esc(meta.filterNote ?? 'Somente jogos agendados, com data após hoje (BRT)')}</p>
+        <p class="pool-form__hint">${esc(meta.filterNote ?? 'Jogos agendados com início em pelo menos 1 hora (BRT)')}</p>
         ${matches.length ? `<div class="pool-matches-list">
           ${matches.map((m) => `
             <label class="pool-match-check">
@@ -291,7 +293,7 @@ async function renderCreate(container) {
               </span>
             </label>
           `).join('')}
-        </div>` : '<p class="pool-empty">Nenhuma partida elegível no momento. Apenas jogos agendados com data posterior a hoje.</p>'}
+        </div>` : '<p class="pool-empty">Nenhuma partida elegível no momento. Só aparecem jogos agendados com início em pelo menos 1 hora.</p>'}
       </fieldset>
       <p class="auth-form__error" id="pool-create-error" hidden></p>
       <button type="submit" class="btn btn--primary" ${matches.length ? '' : 'disabled'}>Criar bolão</button>
@@ -505,10 +507,34 @@ async function renderRules(container) {
 async function renderInvites(container) {
   const pool = state.poolDetail?.pool;
   const isCreator = currentUser && pool?.creatorId === currentUser.id;
+  const isPrivate = pool?.visibility === 'private';
+
+  const privateInviteHTML = isCreator && isPrivate
+    ? `<section class="card pool-invite-user">
+        <h3>Convidar usuário cadastrado</h3>
+        <p class="pool-form__hint">Busque por nome ou e-mail. A pessoa verá o convite ao entrar no site (sem e-mail automático).</p>
+        <div class="pool-invite-search">
+          <input type="search" id="pool-invite-user-q" class="pool-invite-search__input"
+            placeholder="Digite nome ou e-mail..." autocomplete="off" />
+          <p class="pool-form__hint pool-invite-search__hint" id="pool-invite-user-hint">
+            Digite pelo menos 2 caracteres para buscar.
+          </p>
+          <ul id="pool-invite-user-results" class="pool-invite-search-results" hidden></ul>
+        </div>
+      </section>
+      <section class="pool-invite-link-section">
+        <h4>Link aberto (opcional)</h4>
+        <p class="pool-form__hint">Qualquer pessoa com o link pode entrar, mesmo sem convite nominal.</p>
+        <button type="button" class="btn btn--ghost btn--sm" id="pool-new-invite">Gerar link de convite</button>
+      </section>`
+    : isCreator
+      ? '<button type="button" class="btn btn--primary btn--sm" id="pool-new-invite">Gerar link de convite</button>'
+      : '';
 
   container.innerHTML = `
     <div class="pool-invites">
-      ${isCreator ? '<button type="button" class="btn btn--primary btn--sm" id="pool-new-invite">Gerar link de convite</button>' : ''}
+      ${privateInviteHTML}
+      <h3 class="pool-invites__heading">Convites enviados</h3>
       <div id="pool-invites-list" class="pool-loading">Carregando...</div>
     </div>`;
 
@@ -518,6 +544,8 @@ async function renderInvites(container) {
     return;
   }
 
+  if (isPrivate) bindInviteUserSearch(container);
+
   try {
     const data = await fetchPoolInvites(state.poolId);
     const list = document.getElementById('pool-invites-list');
@@ -525,17 +553,77 @@ async function renderInvites(container) {
     list.innerHTML = items.length
       ? `<ul class="pool-invite-list">${items.map((i) => {
           const link = i.invite_token ? `${location.origin}/boloes?join=${i.invite_token}` : '—';
+          const label = i.invitee_user_id
+            ? `${esc(i.invitee_name ?? 'Usuário')} (${esc(i.invitee_email ?? '')})`
+            : 'Link aberto';
+          const typeBadge = i.invitee_user_id
+            ? '<span class="badge badge--pool">Nominal</span>'
+            : '<span class="badge">Link</span>';
           return `<li>
-            <span class="badge badge--pool">${i.status}</span>
-            ${esc(i.invitee_email ?? 'Link aberto')}
-            ${i.invite_token ? `<button type="button" class="btn btn--ghost btn--sm" data-copy-link="${link}">Copiar link</button>` : ''}
+            ${typeBadge}
+            <span class="badge badge--pool">${inviteStatusLabel(i.status)}</span>
+            ${label}
+            ${i.invite_token && i.status === 'pending'
+              ? `<button type="button" class="btn btn--ghost btn--sm" data-copy-link="${link}">Copiar link</button>`
+              : ''}
             <small>Expira ${formatDate(i.expires_at)}</small>
           </li>`;
         }).join('')}</ul>`
-      : '<p class="pool-empty">Nenhum convite ainda. Gere um link acima.</p>';
+      : `<p class="pool-empty">${isPrivate
+        ? 'Nenhum convite ainda. Busque um usuário acima ou gere um link.'
+        : 'Nenhum convite ainda. Gere um link acima.'}</p>`;
   } catch (err) {
     document.getElementById('pool-invites-list').innerHTML = `<p>${esc(err.message)}</p>`;
   }
+}
+
+let inviteSearchGen = 0;
+
+function bindInviteUserSearch(container) {
+  const input = container.querySelector('#pool-invite-user-q');
+  const results = container.querySelector('#pool-invite-user-results');
+  const hint = container.querySelector('#pool-invite-user-hint');
+  if (!input || !results) return;
+
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) {
+      results.hidden = true;
+      results.innerHTML = '';
+      hint.textContent = 'Digite pelo menos 2 caracteres para buscar.';
+      return;
+    }
+    const gen = ++inviteSearchGen;
+    hint.textContent = 'Buscando...';
+    timer = setTimeout(async () => {
+      try {
+        const data = await searchPoolInviteUsers(state.poolId, q);
+        if (gen !== inviteSearchGen) return;
+        const items = data.items ?? [];
+        if (!items.length) {
+          results.hidden = true;
+          hint.textContent = 'Nenhum usuário encontrado (ou já convidado/participando).';
+          return;
+        }
+        hint.textContent = `${items.length} resultado(s)`;
+        results.innerHTML = items.map((u) => `
+          <li>
+            <span class="pool-invite-search-results__user">
+              <strong>${esc(u.name)}</strong>
+              <small>${esc(u.email)}</small>
+            </span>
+            <button type="button" class="btn btn--primary btn--sm" data-invite-user="${u.id}">Convidar</button>
+          </li>`).join('');
+        results.hidden = false;
+      } catch (err) {
+        if (gen !== inviteSearchGen) return;
+        hint.textContent = err.message;
+        results.hidden = true;
+      }
+    }, 350);
+  });
 }
 
 async function renderPublicLink(container) {
@@ -660,6 +748,17 @@ export function initPoolUI(container, opts = {}) {
       return;
     }
 
+    const inviteUserBtn = e.target.closest('[data-invite-user]');
+    if (inviteUserBtn) {
+      const userId = Number(inviteUserBtn.dataset.inviteUser);
+      try {
+        await createPoolInvite(state.poolId, { inviteeUserId: userId });
+        showToastFn('Convite enviado — a pessoa verá ao entrar no site');
+        await renderDetail(container);
+      } catch (err) { showToastFn(err.message); }
+      return;
+    }
+
     const acceptInv = e.target.closest('[data-accept-invite]');
     if (acceptInv) {
       try {
@@ -667,6 +766,17 @@ export function initPoolUI(container, opts = {}) {
         showToastFn('Convite aceito!');
         await renderList(container);
       } catch (err) { showToastFn(err.message); }
+      return;
+    }
+
+    const declineInv = e.target.closest('[data-decline-invite]');
+    if (declineInv) {
+      try {
+        await respondToInvite(Number(declineInv.dataset.declineInvite), false);
+        showToastFn('Convite recusado');
+        await renderList(container);
+      } catch (err) { showToastFn(err.message); }
+      return;
     }
   });
 

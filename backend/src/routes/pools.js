@@ -5,6 +5,7 @@ import {
   fetchPoolMatches, getPoolScoreRules, RECREATIONAL_DISCLAIMER, fetchEligiblePoolMatches,
 } from '../pool/pool-service.js';
 import { joinPool, createInvite, respondInvite, listInvitesForPool, listMyInvites, joinByInviteToken } from '../pool/pool-join.js';
+import { searchUsersForPoolInvite } from '../pool/pool-invite-users.js';
 import { listPredictions, upsertPrediction, getParticipantDetail } from '../pool/pool-predictions.js';
 import { getPoolRanking, recalculatePoolRanking, getRankingEvolution } from '../pool/pool-ranking.js';
 import { buildScoringRulesHtml, normalizeRules } from '../pool/pool-rules.js';
@@ -68,7 +69,7 @@ router.get('/meta/matches', requireAuth, async (req, res, next) => {
       items,
       creator: req.user ? { id: req.user.id, name: req.user.name, email: req.user.email } : null,
       disclaimer: RECREATIONAL_DISCLAIMER,
-      filterNote: 'Somente jogos agendados com data posterior a hoje (horário de Brasília)',
+      filterNote: 'Jogos agendados com início em pelo menos 1 hora (horário de Brasília)',
     });
   } catch (err) { next(err); }
 });
@@ -129,6 +130,18 @@ router.post('/:id/invites', requireAuth, async (req, res, next) => {
   try {
     const invite = await createInvite(Number(req.params.id), req.user.id, req.body);
     res.status(201).json({ invite, disclaimer: RECREATIONAL_DISCLAIMER });
+  } catch (err) { handleError(err, res, next); }
+});
+
+/** GET /api/pools/:id/invite-users?q= — busca usuários para convite (bolão privado) */
+router.get('/:id/invite-users', requireAuth, async (req, res, next) => {
+  try {
+    const result = await searchUsersForPoolInvite(
+      Number(req.params.id),
+      req.user.id,
+      req.query.q
+    );
+    res.json(result);
   } catch (err) { handleError(err, res, next); }
 });
 

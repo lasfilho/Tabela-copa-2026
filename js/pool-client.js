@@ -80,6 +80,11 @@ export async function fetchPoolInvites(poolId) {
   return request(`/pools/${poolId}/invites`);
 }
 
+export async function searchPoolInviteUsers(poolId, query) {
+  const q = encodeURIComponent(query.trim());
+  return request(`/pools/${poolId}/invite-users?q=${q}`);
+}
+
 export async function fetchParticipantDetail(poolId, participantId) {
   return request(`/pools/${poolId}/participants/${participantId}`);
 }
@@ -145,6 +150,16 @@ export function statusLabel(status) {
 export function visibilityLabel(v) {
   const map = { private: 'Privado', link: 'Por link', public: 'Público' };
   return map[v] ?? v;
+}
+
+export function inviteStatusLabel(status) {
+  const map = {
+    pending: 'Pendente',
+    accepted: 'Aceito',
+    declined: 'Recusado',
+    expired: 'Expirado',
+  };
+  return map[status] ?? status;
 }
 
 export function formatDate(d) {

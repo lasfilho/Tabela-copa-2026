@@ -1,9 +1,26 @@
 import crypto from 'crypto';
 import { query, withTransaction } from '../db.js';
+import { findUserByEmail } from '../auth.js';
 import {
   getPoolById, fetchPoolMatches, isParticipant, audit, getPoolBySlug,
 } from './pool-service.js';
 import { canJoinPool } from './pool-timing.js';
+
+async function findPendingInviteByToken(poolId, inviteToken) {
+  const { rows } = await query(
+    `SELECT id, invitee_user_id FROM pool_invites
+     WHERE pool_id = $1 AND invite_token = $2 AND status = 'pending'
+       AND (expires_at IS NULL OR expires_at > NOW())`,
+    [poolId, inviteToken]
+  );
+  return rows[0] ?? null;
+}
+
+function assertInviteTokenForUser(invite, userId) {
+  if (invite?.invitee_user_id && invite.invitee_user_id !== userId) {
+    throw Object.assign(new Error('Este convite é destinado a outro usuário'), { status: 403 });
+  }
+}
 
 export async function joinPool(poolId, userId, { inviteToken = null } = {}) {
   const pool = await getPoolById(poolId);
@@ -24,13 +41,11 @@ export async function joinPool(poolId, userId, { inviteToken = null } = {}) {
     );
     let tokenOk = false;
     if (inviteToken) {
-      const tok = await query(
-        `SELECT id FROM pool_invites
-         WHERE pool_id = $1 AND invite_token = $2 AND status = 'pending'
-           AND (expires_at IS NULL OR expires_at > NOW())`,
-        [poolId, inviteToken]
-      );
-      tokenOk = tok.rows.length > 0;
+      const invite = await findPendingInviteByToken(poolId, inviteToken);
+      if (invite) {
+        assertInviteTokenForUser(invite, userId);
+        tokenOk = true;
+      }
     }
     if (!rows.length && !tokenOk && pool.creatorId !== userId) {
       throw Object.assign(new Error('Bolão privado — somente convidados podem aderir'), { status: 403 });
@@ -38,13 +53,11 @@ export async function joinPool(poolId, userId, { inviteToken = null } = {}) {
   } else if (pool.visibility === 'link') {
     let tokenOk = inviteToken === pool.inviteToken;
     if (!tokenOk && inviteToken) {
-      const tok = await query(
-        `SELECT id FROM pool_invites
-         WHERE pool_id = $1 AND invite_token = $2 AND status = 'pending'
-           AND (expires_at IS NULL OR expires_at > NOW())`,
-        [poolId, inviteToken]
-      );
-      tokenOk = tok.rows.length > 0;
+      const invite = await findPendingInviteByToken(poolId, inviteToken);
+      if (invite) {
+        assertInviteTokenForUser(invite, userId);
+        tokenOk = true;
+      }
     }
     if (!tokenOk) {
       throw Object.assign(new Error('Link de convite inválido'), { status: 403 });
@@ -77,11 +90,45 @@ export async function joinPoolBySlug(slug, userId, opts) {
   return joinPool(pool.id, userId, opts);
 }
 
-export async function createInvite(poolId, inviterId, { inviteeUserId = null, expiresInHours = 168 } = {}) {
+export async function createInvite(poolId, inviterId, {
+  inviteeUserId = null,
+  inviteeEmail = null,
+  expiresInHours = 168,
+} = {}) {
   const pool = await getPoolById(poolId);
   if (!pool) throw Object.assign(new Error('Bolão não encontrado'), { status: 404 });
   if (pool.creatorId !== inviterId) {
     throw Object.assign(new Error('Somente o criador pode convidar'), { status: 403 });
+  }
+
+  let targetUserId = inviteeUserId ? Number(inviteeUserId) : null;
+  if (!targetUserId && inviteeEmail?.trim()) {
+    const user = await findUserByEmail(inviteeEmail);
+    if (!user) {
+      throw Object.assign(new Error('E-mail não cadastrado no sistema'), { status: 404 });
+    }
+    targetUserId = user.id;
+  }
+
+  if (targetUserId) {
+    if (pool.visibility !== 'private') {
+      throw Object.assign(new Error('Convite por usuário só em bolões privados'), { status: 400 });
+    }
+    if (targetUserId === inviterId) {
+      throw Object.assign(new Error('Você já é o criador deste bolão'), { status: 400 });
+    }
+    if (await isParticipant(poolId, targetUserId)) {
+      throw Object.assign(new Error('Esta pessoa já participa do bolão'), { status: 409 });
+    }
+    const { rows: pending } = await query(
+      `SELECT id FROM pool_invites
+       WHERE pool_id = $1 AND invitee_user_id = $2 AND status = 'pending'
+         AND (expires_at IS NULL OR expires_at > NOW())`,
+      [poolId, targetUserId]
+    );
+    if (pending.length) {
+      throw Object.assign(new Error('Já existe convite pendente para esta pessoa'), { status: 409 });
+    }
   }
 
   const token = crypto.randomBytes(24).toString('hex');
@@ -90,16 +137,31 @@ export async function createInvite(poolId, inviterId, { inviteeUserId = null, ex
   const { rows } = await query(
     `INSERT INTO pool_invites (pool_id, inviter_id, invitee_user_id, invite_token, expires_at)
      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [poolId, inviterId, inviteeUserId, token, expiresAt]
+    [poolId, inviterId, targetUserId, token, expiresAt]
   );
 
-  await audit(poolId, inviterId, 'pool.invite.created', { inviteeUserId, token });
+  let inviteeName = null;
+  let inviteeEmailResolved = null;
+  if (targetUserId) {
+    const { rows: userRows } = await query(
+      `SELECT name, email FROM users WHERE id = $1`,
+      [targetUserId]
+    );
+    inviteeName = userRows[0]?.name ?? null;
+    inviteeEmailResolved = userRows[0]?.email ?? null;
+  }
+
+  await audit(poolId, inviterId, 'pool.invite.created', { inviteeUserId: targetUserId, token });
   return {
     id: rows[0].id,
     inviteToken: token,
     inviteLink: `/boloes?join=${token}`,
     expiresAt: rows[0].expires_at,
     status: rows[0].status,
+    inviteeUserId: targetUserId,
+    inviteeName,
+    inviteeEmail: inviteeEmailResolved,
+    personal: Boolean(targetUserId),
   };
 }
 

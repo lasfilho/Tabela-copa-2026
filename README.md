@@ -73,7 +73,7 @@ No bolão, a **fonte da verdade dos resultados** continua sendo `match_results` 
 
 - Criar bolão (nome único, partidas, visibilidade, prazos)
 - Adesão (pública, por link ou privada com convite)
-- Palpites por partida (bloqueio 30 min antes do jogo, horário **Brasília**)
+- Palpites por partida (bloqueio **10 min** antes do jogo, horário **Brasília**)
 - Ranking com desempate
 - Página pública de rankings (`/boloes`)
 
@@ -99,9 +99,9 @@ Regras configuráveis em `pool_score_rules.rules` (JSONB).
 
 ### Prazos (timezone `America/Sao_Paulo`)
 
-- **Criação:** até o dia anterior à primeira partida incluída
-- **Adesão:** até 30 min antes da primeira partida
-- **Palpites:** editáveis até 30 min antes de cada partida; bloqueados após o apito inicial
+- **Criação:** até **1 hora** antes da primeira partida incluída
+- **Adesão:** até **10 min** antes da primeira partida
+- **Palpites:** editáveis até **10 min** antes de cada partida; bloqueados após o apito inicial
 
 ### Modelagem (PostgreSQL)
 

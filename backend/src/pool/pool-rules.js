@@ -36,8 +36,9 @@ export function buildScoringRulesHtml(rules = DEFAULT_SCORE_RULES) {
 </ul>
 <h3>Prazos (horário de Brasília)</h3>
 <ul>
-  <li>Adesão ao bolão: até 30 minutos antes da primeira partida</li>
-  <li>Palpites: editáveis até 30 minutos antes de cada partida</li>
+  <li>Criação do bolão: até <strong>1 hora</strong> antes da primeira partida</li>
+  <li>Adesão ao bolão: até <strong>10 minutos</strong> antes da primeira partida</li>
+  <li>Palpites: editáveis até <strong>10 minutos</strong> antes do início de cada partida</li>
   <li>Após o apito inicial, o palpite é bloqueado automaticamente</li>
 </ul>
 <h3>Desempate no ranking</h3>

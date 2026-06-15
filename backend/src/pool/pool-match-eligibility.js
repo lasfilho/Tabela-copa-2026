@@ -1,15 +1,24 @@
 import { resolveMatchStatus } from '../match-status.js';
-import { matchDateString, matchTimeString, toBrtDateString } from './pool-timing.js';
+import {
+  matchDateString,
+  matchKickoff,
+  matchTimeString,
+  POOL_CREATE_BUFFER_MS,
+} from './pool-timing.js';
 
-/** Partida elegível: status agendado e data posterior a hoje (BRT). */
+/** Partida elegível: agendada e com início em mais de 1 hora (BRT). */
 export function isMatchEligibleForPoolCreation(match, now = new Date()) {
-  const dateStr = matchDateString(match);
-  const todayBrt = toBrtDateString(now);
-
-  if (!dateStr || dateStr <= todayBrt) {
-    return { ok: false, reason: 'Partidas do dia de hoje ou anteriores não podem entrar no bolão' };
+  const kickoff = matchKickoff(match);
+  if (Number.isNaN(kickoff.getTime())) {
+    return { ok: false, reason: 'Data ou horário da partida inválido' };
   }
 
+  const createDeadline = new Date(kickoff.getTime() - POOL_CREATE_BUFFER_MS);
+  if (now > createDeadline) {
+    return { ok: false, reason: 'Partida com menos de 1 hora para o início' };
+  }
+
+  const dateStr = matchDateString(match);
   const time = matchTimeString(match);
   const status = resolveMatchStatus(
     { date: dateStr, time, status: match.status ?? 'scheduled' },
