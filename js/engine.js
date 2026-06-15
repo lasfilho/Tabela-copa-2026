@@ -171,8 +171,15 @@ export function computeKPIs(data) {
   };
 }
 
+const APP_TIMEZONE = 'America/Sao_Paulo';
+
+/** Data de hoje no fuso do torneio (BRT), formato YYYY-MM-DD. */
+export function todayDateString(timeZone = APP_TIMEZONE) {
+  return new Date().toLocaleDateString('en-CA', { timeZone });
+}
+
 export function detectCurrentPhase(matches, tournament) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayDateString();
   const unfinishedGroup = matches.some((m) => m.phase === 'group' && m.status !== 'finished');
   if (unfinishedGroup) return PHASE_LABELS.group;
 
@@ -190,7 +197,7 @@ export function detectCurrentPhase(matches, tournament) {
 
 /** Rótulo simplificado para a barra de status (Visão geral / Jogos). */
 export function getStatusPhaseLabel(matches, tournament) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayDateString();
   const knockoutPhases = ['r32', 'r16', 'qf', 'sf', 'bronze', 'final'];
 
   const unfinishedGroup = matches.some((m) => m.phase === 'group' && m.status !== 'finished');
@@ -285,7 +292,7 @@ export function aggregateStats(data) {
   };
 }
 
-export function getNextMatch(matches, today = new Date().toISOString().slice(0, 10)) {
+export function getNextMatch(matches, today = todayDateString()) {
   const live = matches.find((m) => m.status === 'live');
   if (live) return live;
 
@@ -354,7 +361,7 @@ export function formatDateShort(dateStr) {
 }
 
 export function isToday(dateStr) {
-  return dateStr === new Date().toISOString().slice(0, 10);
+  return dateStr === todayDateString();
 }
 
 export function statusLabel(status) {
