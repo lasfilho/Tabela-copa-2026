@@ -3245,6 +3245,9 @@ body.read-only .score-editor button {
 }
 
 .pool-invite-user { margin-bottom: 1rem; padding: 1rem; }
+.pool-share-link-card { margin-bottom: 1rem; padding: 1rem; }
+.pool-main-link { margin: 0.5rem 0; word-break: break-all; }
+.pool-main-link code { font-size: 0.85rem; }
 .pool-invite-link-section { margin-bottom: 1.25rem; }
 .pool-invite-link-section h4 { margin: 0 0 0.35rem; font-size: 0.95rem; }
 .pool-invites__heading { margin: 1rem 0 0.5rem; font-size: 1rem; }

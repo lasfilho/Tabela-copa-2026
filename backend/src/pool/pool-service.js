@@ -238,8 +238,8 @@ export async function createPool(userId, payload) {
       [poolId, userId, JSON.stringify({ name, matchCount: matchIds.length })]
     );
 
-    return getPoolById(poolId);
-  });
+    return poolId;
+  }).then((poolId) => getPoolById(poolId));
 }
 
 export async function updatePool(poolId, userId, payload) {

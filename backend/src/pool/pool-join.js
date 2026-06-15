@@ -209,7 +209,19 @@ export async function listInvitesForPool(poolId, userId) {
      WHERE pi.pool_id = $1 ORDER BY pi.created_at DESC`,
     [poolId]
   );
-  return rows;
+  return rows.map((row) => ({
+    id: row.id,
+    poolId: row.pool_id,
+    inviterId: row.inviter_id,
+    inviteeUserId: row.invitee_user_id,
+    inviteToken: row.invite_token,
+    status: row.status,
+    expiresAt: row.expires_at,
+    respondedAt: row.responded_at,
+    createdAt: row.created_at,
+    inviteeName: row.invitee_name,
+    inviteeEmail: row.invitee_email,
+  }));
 }
 
 export async function listMyInvites(userId) {
