@@ -22,7 +22,7 @@ import {
 } from './views.js';
 import { renderTeamDetailCharts, destroyTeamCharts } from './team-charts.js';
 import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=24';
-import { initStickers, renderStickers, setStickersUser } from './stickers-ui.js?v=1';
+import { initStickers, renderStickers, setStickersUser } from './stickers-ui.js?v=2';
 import { renderAdminSettings, initAdminSettingsUI } from './admin-settings.js';
 
 const STORAGE_KEY = 'copa2026-ui-cache';

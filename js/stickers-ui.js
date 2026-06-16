@@ -21,6 +21,7 @@ const CATEGORY_LABEL = {
   especial: 'Especiais',
   estadio: 'Estádios',
   escudo: 'Escudos',
+  time: 'Foto do time',
   jogador: 'Jogadores',
 };
 

@@ -193,7 +193,7 @@ Aba **Figurinhas** no dashboard (requer login) para controlar a coleção da Cop
 | Tabela | Descrição |
 |--------|-----------|
 | `albums` | Álbum (suporta múltiplos no futuro; `uq_albums_slug`) |
-| `album_stickers` | Figurinhas: `code`, `title`, `category`, `team_id`, `page`, `sticker_type`, `rarity`, `sort_order` (`uq_album_stickers_code` por álbum) |
+| `album_stickers` | Figurinhas: `code`, `title`, `category` (`especial`, `estadio`, `escudo`, `time`, `jogador`), `team_id`, `page`, `sticker_type`, `rarity`, `sort_order` (`uq_album_stickers_code` por álbum) |
 | `user_sticker_inventory` | Coleção do usuário: `quantity`, `reserved_for_trade` (checks de não-negativo e reserva ≤ repetidas; `uq_user_sticker`) |
 | `sticker_trade_offers` | Ofertas de troca entre usuários |
 | `sticker_trade_matches` | Itens da oferta (`direction = offer/request`) |
@@ -227,7 +227,7 @@ Enums: `sticker_trade_status`, `sticker_trade_direction`. Índices em álbum, ca
 ### Popular dados do álbum (seed)
 
 Gerado automaticamente no primeiro boot por `backend/src/seed/stickers-seed.js` a partir das seleções já cadastradas:
-**10 especiais + (1 escudo + 18 jogadores) × 48 seleções = 922 figurinhas** (álbum `copa-2026`, 20 por página). O seed só roda se o álbum ainda não tiver figurinhas (idempotente).
+**10 especiais + (1 escudo + 1 foto do time + 18 jogadores) × 48 seleções = 970 figurinhas** (álbum `copa-2026`, 20 por página). O seed reconstrói/renumera o álbum automaticamente se a estrutura estiver desatualizada (ex.: faltando a "Foto do time").
 
 ### Fluxo de atualização
 

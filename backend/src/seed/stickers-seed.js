@@ -69,6 +69,19 @@ async function buildStickerRows() {
     });
     order += 1;
 
+    num += 1;
+    stickers.push({
+      code: String(num),
+      title: `${team.name} — Foto do Time`,
+      category: 'time',
+      teamId: team.id,
+      page: pageFor(),
+      type: 'brilhante',
+      rarity: null,
+      sortOrder: order,
+    });
+    order += 1;
+
     for (let p = 1; p <= PLAYERS_PER_TEAM; p++) {
       num += 1;
       stickers.push({
@@ -111,21 +124,31 @@ export async function seedStickerAlbum() {
     albumId = ins.rows[0].id;
   }
 
-  const { rows: countRows } = await query(
-    `SELECT COUNT(*)::int AS n FROM album_stickers WHERE album_id = $1`,
-    [albumId]
-  );
-  if (countRows[0].n > 0) {
-    return { albumId, created: 0 };
-  }
-
   const stickers = await buildStickerRows();
   if (!stickers.length) {
     console.warn('[stickers] nenhuma seleção encontrada — álbum sem figurinhas por enquanto.');
     return { albumId, created: 0 };
   }
 
+  const { rows: statRows } = await query(
+    `SELECT COUNT(*)::int AS n,
+            COUNT(*) FILTER (WHERE category = 'time')::int AS time_count
+     FROM album_stickers WHERE album_id = $1`,
+    [albumId]
+  );
+  const current = statRows[0];
+
+  // Já está na estrutura correta — nada a fazer.
+  if (current.n === stickers.length && current.time_count > 0) {
+    return { albumId, created: 0 };
+  }
+
+  // Estrutura ausente ou desatualizada (ex.: sem "Foto do Time") — reconstrói e renumera.
+  const rebuild = current.n > 0;
   await withTransaction(async (client) => {
+    if (rebuild) {
+      await client.query(`DELETE FROM album_stickers WHERE album_id = $1`, [albumId]);
+    }
     for (const s of stickers) {
       await client.query(
         `INSERT INTO album_stickers
@@ -136,6 +159,11 @@ export async function seedStickerAlbum() {
       );
     }
   });
+
+  if (rebuild) {
+    console.log(`[stickers] álbum "${ALBUM_SLUG}" reconstruído: ${stickers.length} figurinhas (estrutura atualizada).`);
+    return { albumId, created: stickers.length, rebuilt: true };
+  }
 
   console.log(`[stickers] álbum "${ALBUM_SLUG}" populado: ${stickers.length} figurinhas.`);
   return { albumId, created: stickers.length };
