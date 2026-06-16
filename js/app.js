@@ -21,7 +21,7 @@ import {
   openScoreModal, setPermissions,
 } from './views.js';
 import { renderTeamDetailCharts, destroyTeamCharts } from './team-charts.js';
-import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=23';
+import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=24';
 import { renderAdminSettings, initAdminSettingsUI } from './admin-settings.js';
 
 const STORAGE_KEY = 'copa2026-ui-cache';
@@ -374,7 +374,7 @@ async function persistMatchScore(matchId, homeRaw, awayRaw, options = {}) {
     await saveMatchScore(state.mode, matchId, homeRaw, awayRaw);
     await reloadData();
     renderAll();
-    if (!quiet) showToast('Placar salvo no banco de dados');
+    if (!quiet) showToast('Placar salvo — jogo marcado como encerrado');
   } catch (err) {
     showToast(err.message);
   }

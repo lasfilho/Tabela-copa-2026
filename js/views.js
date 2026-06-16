@@ -84,7 +84,7 @@ export function bindScoreEditors(root, handler, options = {}) {
   const autoSave = options.autoSave ?? Boolean(root.querySelector('.score-editor--autosave'));
   const lastSaved = new Map();
 
-  const commit = (wrap, { quiet = autoSave } = {}) => {
+  const commit = (wrap, { quiet = autoSave, force = false } = {}) => {
     if (!wrap?.dataset.matchId) return;
     const { id, home, away } = readScoreEditor(wrap);
     const homeEmpty = home === '';
@@ -100,7 +100,7 @@ export function bindScoreEditors(root, handler, options = {}) {
     }
 
     const key = `${home}|${away}`;
-    if (lastSaved.get(id) === key) return;
+    if (!force && lastSaved.get(id) === key) return;
 
     Promise.resolve(handler(id, home, away, { quiet }))
       .then(() => lastSaved.set(id, key))
@@ -110,7 +110,7 @@ export function bindScoreEditors(root, handler, options = {}) {
   if (!autoSave) {
     root.querySelectorAll('[data-save-score]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        commit(btn.closest('.score-editor'), { quiet: false });
+        commit(btn.closest('.score-editor'), { quiet: false, force: true });
       });
     });
   }
@@ -119,9 +119,11 @@ export function bindScoreEditors(root, handler, options = {}) {
     const inputs = wrap.querySelectorAll('input[data-side]');
     if (!inputs.length) return;
 
-    const { id, home, away } = readScoreEditor(wrap);
-    if (id && home !== '' && away !== '') {
-      lastSaved.set(id, `${home}|${away}`);
+    if (autoSave) {
+      const { id, home, away } = readScoreEditor(wrap);
+      if (id && home !== '' && away !== '') {
+        lastSaved.set(id, `${home}|${away}`);
+      }
     }
 
     if (autoSave) {

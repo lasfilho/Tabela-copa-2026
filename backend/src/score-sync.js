@@ -13,6 +13,7 @@ import {
   fetchSportsDbJson,
   getSportsDbRateLimitUntil,
 } from './sportsdb-fetch.js';
+import { finalizeStaleLiveResults } from './match-status.js';
 
 const LEAGUE_ID = '4429';
 const SEASON = '2026';
@@ -298,6 +299,14 @@ export async function runScoreSync() {
     state.lastSkipped = skipped;
     state.lastLive = liveCount;
     state.lastGoalsSynced = goalsSynced;
+
+    const { finalized, matchIds } = await finalizeStaleLiveResults();
+    if (finalized > 0) {
+      console.log(`[sync] ${finalized} jogo(s) finalizado(s) automaticamente (placar + 90 min)`);
+      for (const id of matchIds) {
+        recalculatePoolsForMatch(id).catch((err) => console.error('Pool ranking recalc:', err.message));
+      }
+    }
 
     return {
       ok: true,

@@ -2,9 +2,15 @@
  * Status efetivo do jogo com base no horário de Brasília (BRT).
  */
 const TZ_OFFSET = '-03:00';
+/** Após ~90 min do apito, placar completo no banco = jogo encerrado. */
+const MATCH_DURATION_MS = 90 * 60 * 1000;
 
 export function matchKickoff(match) {
   return new Date(`${match.date}T${match.time}:00${TZ_OFFSET}`);
+}
+
+function hasFullScore(match) {
+  return match.homeScore != null && match.awayScore != null;
 }
 
 export function resolveMatchStatus(match, now = new Date(), options = {}) {
@@ -16,11 +22,13 @@ export function resolveMatchStatus(match, now = new Date(), options = {}) {
   }
 
   if (match.status === 'finished') return 'finished';
+
+  if (hasFullScore(match) && now.getTime() >= kickoff.getTime() + MATCH_DURATION_MS) {
+    return 'finished';
+  }
+
   if (match.status === 'live') return 'live';
-
-  // Após o apito: permanece "em andamento" até a API ou admin registrar o placar final
   if (now >= kickoff) return 'live';
-
   return 'scheduled';
 }
 

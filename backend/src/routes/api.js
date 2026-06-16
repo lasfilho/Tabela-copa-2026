@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { TOURNAMENT } from '../seed.js';
-import { resolveMatchStatus } from '../match-status.js';
+import { resolveMatchStatus, finalizeStaleLiveResults } from '../match-status.js';
 import { getSyncStatus, setSyncEnabled, runScoreSync } from '../score-sync.js';
 import { authMiddleware, canWriteScores, requireAdmin } from '../auth.js';
 import { recalculatePoolsForMatch } from '../pool/pool-ranking.js';
@@ -37,6 +37,13 @@ router.get('/bootstrap', async (req, res, next) => {
     let mode = req.query.mode === 'simulation' ? 'simulation' : 'real';
     if (mode === 'simulation' && !req.user) {
       mode = 'real';
+    }
+
+    if (mode === 'real') {
+      const { matchIds } = await finalizeStaleLiveResults();
+      for (const id of matchIds) {
+        recalculatePoolsForMatch(id).catch((err) => console.error('Pool ranking recalc:', err.message));
+      }
     }
 
     const [teamsRes, groupsRes, matchesRes, scorersRes, matchGoalsRes, squadRes, prefsRes] = await Promise.all([
