@@ -7,8 +7,8 @@ export const DEFAULT_SCORE_RULES = {
   version: 2,
   exactScore: 8,
   correctResult: 5,
-  correctHomeGoals: 2,
-  correctAwayGoals: 2,
+  correctWinnerGoals: 2,
+  correctLoserGoals: 2,
 };
 
 export const RECREATIONAL_DISCLAIMER =
@@ -21,9 +21,9 @@ export function buildScoringRulesHtml(rules = DEFAULT_SCORE_RULES) {
 <ul>
   <li><strong>Placar exato:</strong> ${r.exactScore} pontos</li>
   <li><strong>Resultado correto</strong> (vitória/empate, placar errado): ${r.correctResult} pontos</li>
-  <li><strong>Gols do mandante corretos</strong> (sem placar exato): +${r.correctHomeGoals} pontos</li>
-  <li><strong>Gols do visitante corretos</strong> (sem placar exato): +${r.correctAwayGoals} pontos</li>
-  <li>Os bônus de gols do mandante/visitante <strong>somam</strong> ao acerto de resultado quando o placar não é exato</li>
+  <li><strong>Placar do vencedor correto</strong> (sem placar exato): +${r.correctWinnerGoals} pontos</li>
+  <li><strong>Placar do perdedor correto</strong> (sem placar exato): +${r.correctLoserGoals} pontos</li>
+  <li>Os bônus de vencedor/perdedor só valem em jogos com vitória (não se aplicam a empates)</li>
   <li><strong>Sem palpite:</strong> 0 pontos</li>
   <li><strong>Palpite fora do prazo:</strong> não permitido</li>
 </ul>
@@ -79,21 +79,36 @@ export function calculatePredictionPoints(prediction, actual, rules = DEFAULT_SC
   }
 
   let points = 0;
-  const resultHit = matchOutcome(ph, pa) === matchOutcome(ah, aa);
+  const predictedOutcome = matchOutcome(ph, pa);
+  const actualOutcome = matchOutcome(ah, aa);
+  const resultHit = predictedOutcome === actualOutcome;
   if (resultHit) points += r.correctResult;
-  if (ph === ah) points += r.correctHomeGoals;
-  if (pa === aa) points += r.correctAwayGoals;
+
+  // Bônus de vencedor/perdedor:
+  // - só quando o resultado (vencedor) foi acertado
+  // - não se aplica para empate
+  if (resultHit && actualOutcome !== 'draw') {
+    const predictedWinnerGoals = predictedOutcome === 'home' ? ph : pa;
+    const predictedLoserGoals = predictedOutcome === 'home' ? pa : ph;
+    const actualWinnerGoals = actualOutcome === 'home' ? ah : aa;
+    const actualLoserGoals = actualOutcome === 'home' ? aa : ah;
+
+    if (predictedWinnerGoals === actualWinnerGoals) points += r.correctWinnerGoals;
+    if (predictedLoserGoals === actualLoserGoals) points += r.correctLoserGoals;
+  }
 
   return { points, exact: false, resultHit };
 }
 
 export function normalizeRules(raw) {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_SCORE_RULES };
+  const winnerGoals = raw.correctWinnerGoals ?? raw.correctHomeGoals;
+  const loserGoals = raw.correctLoserGoals ?? raw.correctAwayGoals;
   return {
     version: raw.version ?? 2,
     exactScore: Number(raw.exactScore ?? DEFAULT_SCORE_RULES.exactScore),
     correctResult: Number(raw.correctResult ?? DEFAULT_SCORE_RULES.correctResult),
-    correctHomeGoals: Number(raw.correctHomeGoals ?? DEFAULT_SCORE_RULES.correctHomeGoals),
-    correctAwayGoals: Number(raw.correctAwayGoals ?? DEFAULT_SCORE_RULES.correctAwayGoals),
+    correctWinnerGoals: Number(winnerGoals ?? DEFAULT_SCORE_RULES.correctWinnerGoals),
+    correctLoserGoals: Number(loserGoals ?? DEFAULT_SCORE_RULES.correctLoserGoals),
   };
 }
