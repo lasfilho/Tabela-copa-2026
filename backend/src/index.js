@@ -5,6 +5,7 @@ import apiRouter from './routes/api.js';
 import authRouter from './routes/auth.js';
 import poolsRouter from './routes/pools.js';
 import publicPoolsRouter from './routes/public-pools.js';
+import stickersRouter from './routes/stickers.js';
 import adminRouter from './routes/admin.js';
 import { initDatabase } from './seed.js';
 import { startScoreSyncWorker } from './score-sync.js';
@@ -20,6 +21,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/pools', poolsRouter);
 app.use('/api/public', publicPoolsRouter);
+app.use('/api/stickers', stickersRouter);
 app.use('/api', apiRouter);
 
 // Frontend estático (mantém o visual existente)

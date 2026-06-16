@@ -7,6 +7,7 @@ import {
 } from './seed/schedule.js';
 import { findUserByEmail, hashPassword } from './auth.js';
 import { runPoolMigrations, seedPoolData } from './seed/pool-seed.js';
+import { runStickerMigrations, seedStickerAlbum } from './seed/stickers-seed.js';
 import { hasSyncedGoals, recalculateTopScorersFromGoals } from './goal-sync.js';
 import { syncAllSquads } from './squad-sync.js';
 
@@ -111,11 +112,13 @@ export async function initDatabase() {
   }
   await runMigrations();
   await runPoolMigrations();
+  await runStickerMigrations();
   await seedDatabase();
   await syncTopScorers();
   scheduleSquadSync();
   await seedAdminUser();
   await seedPoolData();
+  await seedStickerAlbum();
 }
 
 /** Importa elencos sem bloquear o HTTP server. Em produção evita fotos (rate limit). */

@@ -22,6 +22,7 @@ import {
 } from './views.js';
 import { renderTeamDetailCharts, destroyTeamCharts } from './team-charts.js';
 import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=24';
+import { initStickers, renderStickers, setStickersUser } from './stickers-ui.js?v=1';
 import { renderAdminSettings, initAdminSettingsUI } from './admin-settings.js';
 
 const STORAGE_KEY = 'copa2026-ui-cache';
@@ -82,6 +83,7 @@ async function init() {
   initUI();
   initAuthUI();
   initAdminUI();
+  initStickers(document.getElementById('stickers-content'), { showToast, currentUser: state.user });
   initScoreSync();
   startLiveStatusTicker();
   navigate(state.section);
@@ -799,6 +801,10 @@ function renderAll() {
       break;
     case 'calendar':
       renderCalendar(data, state, openScoreModal);
+      break;
+    case 'stickers':
+      setStickersUser(state.user);
+      renderStickers({ currentUser: state.user, showToast });
       break;
     case 'settings':
       renderAdminSettings(document.getElementById('settings-content'), {

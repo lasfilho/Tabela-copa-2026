@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=42" />
+  <link rel="stylesheet" href="styles.css?v=43" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="data/embedded.js"></script>
 </head>
@@ -44,6 +44,9 @@
         </a>
         <a href="#calendar" class="nav-link" data-section="calendar" title="Calendário">
           <span class="nav-icon">📅</span><span class="nav-label">Calendário</span>
+        </a>
+        <a href="#stickers" class="nav-link" data-section="stickers" title="Álbum de Figurinhas">
+          <span class="nav-icon">🃏</span><span class="nav-label">Figurinhas</span>
         </a>
         <a href="/boloes" class="nav-link nav-link--external" title="Ranking público dos bolões">
           <span class="nav-icon">🎯</span><span class="nav-label">Ranking dos Bolões</span>
@@ -237,6 +240,17 @@
           </div>
           <div id="calendar-view"></div>
         </section>
+
+        <!-- STICKERS / FIGURINHAS -->
+        <section class="view" id="view-stickers" data-view="stickers" hidden>
+          <div class="view-header">
+            <div>
+              <h1>Álbum de Figurinhas</h1>
+              <p class="view-subtitle">Controle sua coleção, faltantes, repetidas e trocas da Copa 2026</p>
+            </div>
+          </div>
+          <div id="stickers-content"></div>
+        </section>
       </main>
     </div>
   </div>
@@ -269,6 +283,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=24"></script>
+  <script type="module" src="js/app.js?v=25"></script>
 </body>
 </html>

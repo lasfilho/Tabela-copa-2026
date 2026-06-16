@@ -175,6 +175,79 @@ docker compose up --build
 
 ---
 
+## Módulo Álbum de Figurinhas
+
+Aba **Figurinhas** no dashboard (requer login) para controlar a coleção da Copa: o que você possui, o que falta, repetidas, trocas e estatísticas. Segue a mesma arquitetura (frontend JS + API REST + PostgreSQL).
+
+### Visão geral
+
+- **Dashboard** — total, possuídas, faltantes, repetidas, % de conclusão, progresso por categoria e seleção, páginas completas/quase completas.
+- **Minha coleção** — grade/tabela com busca, filtros (categoria, seleção, tipo, página, status) e botões +/−. **Lançamento rápido** por números colados (vírgula, espaço ou quebra de linha).
+- **Faltantes** — chips com os números, **copiar lista**, **exportar CSV** e **texto para WhatsApp**.
+- **Repetidas** — quantidade repetida + reserva para troca (não permite reservar a única possuída).
+- **Trocas** — sugestões de match (cruza minhas faltantes × repetidas de outros e vice-versa), criar/aceitar/recusar/cancelar/concluir ofertas e histórico.
+- **Estatísticas** — progresso por categoria/seleção e repetidas por categoria.
+
+### Modelagem (PostgreSQL) — `backend/src/schema-stickers.sql`
+
+| Tabela | Descrição |
+|--------|-----------|
+| `albums` | Álbum (suporta múltiplos no futuro; `uq_albums_slug`) |
+| `album_stickers` | Figurinhas: `code`, `title`, `category`, `team_id`, `page`, `sticker_type`, `rarity`, `sort_order` (`uq_album_stickers_code` por álbum) |
+| `user_sticker_inventory` | Coleção do usuário: `quantity`, `reserved_for_trade` (checks de não-negativo e reserva ≤ repetidas; `uq_user_sticker`) |
+| `sticker_trade_offers` | Ofertas de troca entre usuários |
+| `sticker_trade_matches` | Itens da oferta (`direction = offer/request`) |
+| `sticker_trade_history` | Histórico de ações da oferta |
+
+Enums: `sticker_trade_status`, `sticker_trade_direction`. Índices em álbum, categoria, seleção, página e por usuário.
+
+**Regras de coleção:** `quantity = 0` → faltando; `= 1` → possuída; `> 1` → excedente é repetida; quantidade nunca negativa.
+
+### API REST (autenticada salvo catálogo) — prefixo `/api/stickers`
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/albums` | Lista de álbuns |
+| GET | `/albums/:id` | Detalhe do álbum |
+| GET | `/albums/:id/stickers` | Figurinhas do álbum |
+| GET | `/me/album` | Minha coleção (álbum padrão) |
+| POST | `/me/album/stickers/:id/increment` | +1 |
+| POST | `/me/album/stickers/:id/decrement` | −1 |
+| POST | `/me/album/stickers/:id/quantity` | Definir quantidade |
+| POST | `/me/album/stickers/:id/reserve` | Reservar repetidas p/ troca |
+| POST | `/me/album/bulk-update` | Lançamento em lote por códigos |
+| GET | `/me/album/missing` | Faltantes |
+| GET | `/me/album/duplicates` | Repetidas |
+| GET | `/me/album/stats` | Estatísticas |
+| GET | `/trades/suggestions` | Sugestões de troca |
+| GET/POST | `/trades/offers` | Listar / criar oferta |
+| PATCH | `/trades/offers/:id` | `accepted`/`declined`/`cancelled`/`completed` |
+| GET | `/trades/history` | Histórico |
+
+### Popular dados do álbum (seed)
+
+Gerado automaticamente no primeiro boot por `backend/src/seed/stickers-seed.js` a partir das seleções já cadastradas:
+**10 especiais + (1 escudo + 18 jogadores) × 48 seleções = 922 figurinhas** (álbum `copa-2026`, 20 por página). O seed só roda se o álbum ainda não tiver figurinhas (idempotente).
+
+### Fluxo de atualização
+
+`+`/`−` chamam increment/decrement (upsert no inventário); o lançamento em lote separa os códigos e soma ocorrências; ao reduzir a quantidade as reservas são ajustadas automaticamente.
+
+### Fluxo de trocas
+
+1. Marque repetidas como **reservadas para troca**.
+2. Em **Trocas**, o sistema sugere usuários com match (você precisa × ele tem / você oferece × ele precisa).
+3. **Propor troca** cria a oferta; o destinatário **aceita/recusa**; ambos podem **concluir** após aceita. A combinação física é feita fora da plataforma (recreativo).
+
+### Testar
+
+```bash
+docker compose up --build
+# Login: admin@copa2026.local / admin123 → aba Figurinhas
+```
+
+---
+
 ## Modos Real e Simulação
 
 - **Real** — placares oficiais (sync + admin)
@@ -219,11 +292,17 @@ copa-2026/
 ├── js/
 │   ├── pool-client.js
 │   ├── pool-ui.js
-│   └── boloes-page.js
+│   ├── boloes-page.js
+│   ├── stickers-client.js       ← cliente API figurinhas
+│   └── stickers-ui.js           ← aba Figurinhas
 ├── backend/src/
 │   ├── pool/                    ← domínio bolão
+│   ├── stickers/                ← domínio figurinhas
 │   ├── routes/pools.js
 │   ├── routes/public-pools.js
-│   └── schema-pools.sql
+│   ├── routes/stickers.js
+│   ├── schema-pools.sql
+│   ├── schema-stickers.sql
+│   └── seed/stickers-seed.js
 └── data/
 ```
