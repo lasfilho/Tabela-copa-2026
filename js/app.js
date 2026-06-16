@@ -21,7 +21,7 @@ import {
   openScoreModal, setPermissions,
 } from './views.js';
 import { renderTeamDetailCharts, destroyTeamCharts } from './team-charts.js';
-import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=22';
+import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=23';
 import { renderAdminSettings, initAdminSettingsUI } from './admin-settings.js';
 
 const STORAGE_KEY = 'copa2026-ui-cache';
@@ -120,6 +120,20 @@ function applyAuthUI() {
   document.querySelectorAll('.admin-only').forEach((el) => {
     el.hidden = !p.canManageSync;
   });
+
+  const matchesAdminBar = document.getElementById('matches-admin-bar');
+  if (matchesAdminBar) {
+    matchesAdminBar.hidden = !p.canManageSync || state.mode !== 'real';
+  }
+
+  const matchesSubtitle = document.getElementById('matches-subtitle');
+  if (matchesSubtitle) {
+    matchesSubtitle.textContent = p.canManageSync && state.mode === 'real'
+      ? 'Modo Real — sincronização automática ou edição manual de placares (admin)'
+      : state.mode === 'simulation'
+        ? 'Simulação — edite placares livremente'
+        : 'Placares oficiais · atualização automática via TheSportsDB';
+  }
 
   document.querySelectorAll('.admin-only-nav').forEach((el) => {
     el.hidden = !p.canAccessAdminSettings;
@@ -598,32 +612,42 @@ function initScoreSync() {
     }
   });
 
-  document.getElementById('sync-run-btn')?.addEventListener('click', async () => {
-    if (state.offline) {
-      showToast('API offline — inicie o Docker');
-      return;
-    }
-    showToast('Sincronizando placares...');
-    try {
-      const result = await runScoreSyncNow();
-      updateSyncUI(result);
-      if (result.updated > 0) {
-        await reloadData();
-        if (state.mode === 'pool') {
-          updatePoolContext({ teamMap: data?.teamMap ?? {}, showToast, currentUser: state.user });
-        } else {
-          renderAll();
-        }
-        showToast(`${result.updated} placar(es) atualizado(s)`);
-      } else if (result.skipped) {
-        showToast('Sync desligada');
+  document.getElementById('sync-run-btn')?.addEventListener('click', () => runManualScoreSync());
+
+  document.getElementById('matches-sync-btn')?.addEventListener('click', () => runManualScoreSync());
+}
+
+async function runManualScoreSync() {
+  if (state.offline) {
+    showToast('API offline — inicie o Docker');
+    return;
+  }
+  if (!state.permissions.canManageSync) {
+    showToast('Somente administradores podem sincronizar');
+    return;
+  }
+  showToast('Sincronizando placares...');
+  try {
+    const result = await runScoreSyncNow();
+    updateSyncUI(result);
+    if (result.updated > 0) {
+      await reloadData();
+      if (state.mode === 'pool') {
+        updatePoolContext({ teamMap: data?.teamMap ?? {}, showToast, currentUser: state.user });
       } else {
-        showToast(result.error || 'Nenhum placar novo para importar');
+        renderAll();
       }
-    } catch (err) {
-      showToast(err.message);
+      showToast(`${result.updated} placar(es) atualizado(s)`);
+    } else if (result.skipped) {
+      showToast('Sync desligada — ligue no botão ⚡ da barra superior');
+    } else if (result.reason === 'already_running') {
+      showToast('Sync já em andamento');
+    } else {
+      showToast(result.error || 'Nenhum placar novo na API — use edição manual no jogo');
     }
-  });
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 function initUI() {

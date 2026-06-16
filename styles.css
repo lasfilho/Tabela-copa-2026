@@ -3245,6 +3245,17 @@ body.read-only .score-editor button {
 }
 
 .pool-invite-user { margin-bottom: 1rem; padding: 1rem; }
+
+.matches-admin-bar {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.matches-admin-bar p { margin: 0; flex: 1 1 280px; font-size: 0.9rem; color: var(--text-muted); }
+
 .pool-share-link-card { margin-bottom: 1rem; padding: 1rem; }
 .pool-main-link { margin: 0.5rem 0; word-break: break-all; }
 .pool-main-link code { font-size: 0.85rem; }

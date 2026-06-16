@@ -1,0 +1,25 @@
+# Dispara deploy no Render após push em main.
+# Configure o secret RENDER_DEPLOY_HOOK no GitHub:
+#   Render → serviço copa-2026 → Settings → Deploy Hook → copiar URL
+#   GitHub → repo → Settings → Secrets → Actions → RENDER_DEPLOY_HOOK
+
+name: deploy-render
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hook
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK não configurado — faça deploy manual no painel Render."
+            exit 0
+          fi
+          curl -fsS -X POST "$DEPLOY_HOOK"
+          echo "Deploy solicitado ao Render."

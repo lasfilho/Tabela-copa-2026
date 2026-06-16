@@ -77,7 +77,36 @@ Render free “dorme” após 15 min sem tráfego.
 
 ## Atualizar produção
 
-Cada `git push` na branch `main` dispara deploy automático no Render.
+### Deploy automático (recomendado)
+
+1. **Render** → serviço `copa-2026` → **Settings** → **Build & Deploy**
+2. Confirme que **Auto-Deploy** está **Yes** e o repositório GitHub está conectado
+3. Cada `git push` em `main` deve disparar um novo deploy
+
+**Alternativa — Deploy Hook (GitHub Actions):**
+
+1. Render → **Settings** → **Deploy Hook** → copie a URL
+2. GitHub → repo → **Settings** → **Secrets and variables** → **Actions**
+3. Crie o secret `RENDER_DEPLOY_HOOK` com a URL copiada
+4. O workflow `.github/workflows/deploy-render.yml` dispara o deploy a cada push
+
+### Deploy manual (se o push não atualizou)
+
+1. [dashboard.render.com](https://dashboard.render.com) → serviço **copa-2026**
+2. **Manual Deploy** → **Deploy latest commit**
+3. Aguarde status **Live** (5–10 min)
+
+### Confirmar que produção está atualizada
+
+Abra `/api/health` — a resposta inclui o commit deployado:
+
+```json
+{ "ok": true, "commit": "31ea71b", "service": "copa-2026" }
+```
+
+Compare com o último commit em GitHub (`git log -1 --oneline`). Se `commit` for `null` ou antigo, o deploy ainda não rodou.
+
+Depois do deploy, faça **Ctrl+Shift+R** no navegador (cache do JS).
 
 ```bash
 git push origin main

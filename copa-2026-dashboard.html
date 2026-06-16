@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=41" />
+  <link rel="stylesheet" href="styles.css?v=42" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="data/embedded.js"></script>
 </head>
@@ -158,7 +158,11 @@
         <section class="view" id="view-matches" data-view="matches" hidden>
           <div class="view-header">
             <h1>Jogos</h1>
-            <p class="view-subtitle">Edite placares diretamente na tabela · mata-mata preenche automaticamente</p>
+            <p class="view-subtitle" id="matches-subtitle">Placares oficiais (modo Real) · atualização automática via TheSportsDB</p>
+          </div>
+          <div class="matches-admin-bar admin-only card" id="matches-admin-bar" hidden>
+            <p><strong>Admin:</strong> se a API não atualizou, use <em>Sincronizar agora</em> ou digite o placar no jogo e clique <em>OK</em> — o jogo passa para <em>Encerrado</em>.</p>
+            <button type="button" class="btn btn--primary btn--sm" id="matches-sync-btn">Sincronizar agora</button>
           </div>
           <div class="filters-bar" id="matches-filters"></div>
           <div id="matches-table-wrap"></div>
@@ -265,6 +269,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=22"></script>
+  <script type="module" src="js/app.js?v=23"></script>
 </body>
 </html>

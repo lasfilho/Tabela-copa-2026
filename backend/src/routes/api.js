@@ -265,7 +265,11 @@ router.post('/sync/run', requireAdmin, async (_req, res, next) => {
 router.get('/health', async (_req, res) => {
   try {
     await query('SELECT 1');
-    res.json({ ok: true });
+    res.json({
+      ok: true,
+      commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? null,
+      service: process.env.RENDER_SERVICE_NAME ?? null,
+    });
   } catch {
     res.status(503).json({ ok: false });
   }
