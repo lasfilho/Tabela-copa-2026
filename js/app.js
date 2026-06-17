@@ -639,14 +639,19 @@ async function refreshSyncStatus(reloadIfUpdated = false) {
     const prevOk = lastSyncOkAt;
     lastSyncOkAt = status.lastOkAt ?? null;
     updateSyncUI(status);
-    if (reloadIfUpdated && status.lastOkAt && status.lastOkAt !== prevOk && status.lastUpdated > 0) {
+    if (reloadIfUpdated && status.lastOkAt && status.lastOkAt !== prevOk
+        && (status.lastUpdated > 0 || status.lastGoalsSynced > 0)) {
       await reloadData();
       if (state.mode === 'pool') {
         updatePoolContext({ teamMap: data?.teamMap ?? {}, showToast, currentUser: state.user });
       } else {
         renderAll();
       }
-      showToast(`${status.lastUpdated} placar(es) sincronizado(s) automaticamente`);
+      if (status.lastUpdated > 0) {
+        showToast(`${status.lastUpdated} placar(es) sincronizado(s) automaticamente`);
+      } else if (status.lastGoalsSynced > 0) {
+        showToast(`Artilheiros atualizados (${status.lastGoalsSynced} jogo(s))`);
+      }
     }
   } catch { /* ignore */ }
 }
@@ -728,14 +733,18 @@ async function runManualScoreSync() {
   try {
     const result = await runScoreSyncNow();
     updateSyncUI(result);
-    if (result.updated > 0) {
+    if (result.updated > 0 || result.goalsSynced > 0) {
       await reloadData();
       if (state.mode === 'pool') {
         updatePoolContext({ teamMap: data?.teamMap ?? {}, showToast, currentUser: state.user });
       } else {
         renderAll();
       }
-      showToast(`${result.updated} placar(es) atualizado(s)`);
+      if (result.updated > 0) {
+        showToast(`${result.updated} placar(es) atualizado(s)`);
+      } else {
+        showToast(`Artilheiros atualizados (${result.goalsSynced} jogo(s))`);
+      }
     } else if (result.skipped) {
       showToast('Sync desligada — ligue no botão ⚡ da barra superior');
     } else if (result.reason === 'already_running') {

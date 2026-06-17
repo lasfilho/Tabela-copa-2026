@@ -4,6 +4,7 @@ import { TOURNAMENT } from '../seed.js';
 import { resolveMatchStatus, finalizeStaleLiveResults } from '../match-status.js';
 import { getSyncStatus, setSyncEnabled, runScoreSync } from '../score-sync.js';
 import { getSportsApiStatus } from '../sportsdb-fetch.js';
+import { fetchTopScorersRows } from '../goal-sync.js';
 import { authMiddleware, canWriteScores, requireAdmin } from '../auth.js';
 import { recalculatePoolsForMatch } from '../pool/pool-ranking.js';
 
@@ -61,10 +62,7 @@ router.get('/bootstrap', async (req, res, next) => {
         LEFT JOIN match_results r ON r.match_id = m.id AND r.mode = $1
         ORDER BY m.match_date, m.match_time, m.id
       `, [mode]),
-      query(`
-        SELECT ts.player, ts.team_id AS team, ts.goals, ts.assists
-        FROM top_scorers ts ORDER BY ts.goals DESC, ts.player
-      `),
+      fetchTopScorersRows(),
       query(`
         SELECT
           mg.match_id AS "matchId",
@@ -111,7 +109,7 @@ router.get('/bootstrap', async (req, res, next) => {
       groups,
       matches,
       stats: {
-        topScorers: scorersRes.rows,
+        topScorers: scorersRes,
         matchGoals: matchGoalsRes.rows,
         squads: squadRes.rows,
         meta: { timezone: 'America/Sao_Paulo' },

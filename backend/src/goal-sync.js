@@ -350,36 +350,44 @@ export async function recalculateTopScorersFromGoals() {
         AND counts_for_scorer = true
         AND is_own_goal = false
       GROUP BY player, team_id
-    ),
-    assist_counts AS (
-      SELECT assist_player AS player, team_id, COUNT(*)::smallint AS assists
-      FROM match_goals
-      WHERE team_id IS NOT NULL
-        AND assist_player IS NOT NULL
-        AND assist_player <> ''
-        AND counts_for_scorer = true
-        AND is_own_goal = false
-      GROUP BY assist_player, team_id
-    ),
-    merged AS (
-      SELECT
-        COALESCE(g.player, a.player) AS player,
-        COALESCE(g.team_id, a.team_id) AS team_id,
-        COALESCE(g.goals, 0) AS goals,
-        COALESCE(a.assists, 0) AS assists
-      FROM goal_counts g
-      FULL OUTER JOIN assist_counts a
-        ON g.player = a.player AND g.team_id = a.team_id
     )
     INSERT INTO top_scorers (player, team_id, goals, assists)
-    SELECT player, team_id, goals, assists
-    FROM merged
-    WHERE goals > 0 OR assists > 0
-    ORDER BY goals DESC, assists DESC, player
+    SELECT player, team_id, goals, 0
+    FROM goal_counts
+    WHERE goals > 0
+    ORDER BY goals DESC, player
   `);
 
   const { rows } = await query(`SELECT COUNT(*)::int AS n FROM top_scorers`);
   return { updated: true, scorers: rows[0].n };
+}
+
+/** Artilheiros para exibição — calcula de match_goals quando houver importação real. */
+export async function fetchTopScorersRows() {
+  const { rows: countRows } = await query(`SELECT COUNT(*)::int AS n FROM match_goals`);
+  if (countRows[0].n > 0) {
+    const { rows } = await query(`
+      SELECT g.player, g.team_id AS team, COUNT(*)::int AS goals
+      FROM match_goals g
+      INNER JOIN match_results r ON r.match_id = g.match_id AND r.mode = 'real'
+      WHERE g.team_id IS NOT NULL
+        AND g.player IS NOT NULL
+        AND g.counts_for_scorer = true
+        AND g.is_own_goal = false
+      GROUP BY g.player, g.team_id
+      HAVING COUNT(*) > 0
+      ORDER BY goals DESC, g.player
+    `);
+    return rows;
+  }
+
+  const { rows } = await query(`
+    SELECT player, team_id AS team, goals
+    FROM top_scorers
+    WHERE goals > 0
+    ORDER BY goals DESC, player
+  `);
+  return rows;
 }
 
 export async function hasSyncedGoals() {

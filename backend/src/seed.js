@@ -63,10 +63,20 @@ export async function seedDatabase() {
   console.log(`Seed concluído: ${TEAMS.length} times, ${ALL_MATCHES.length} jogos.`);
 }
 
-/** Atualiza artilheiros demo (upsert) — só quando ainda não há gols importados da API. */
+/** Atualiza artilheiros — recalcula de gols importados ou limpa demo se torneio já começou. */
 export async function syncTopScorers() {
   if (await hasSyncedGoals()) {
     await recalculateTopScorersFromGoals();
+    return;
+  }
+
+  const { rows } = await query(`
+    SELECT COUNT(*)::int AS n FROM match_results
+    WHERE mode = 'real' AND status = 'finished'
+      AND (COALESCE(home_score, 0) + COALESCE(away_score, 0)) > 0
+  `);
+  if (rows[0].n > 0) {
+    await query(`DELETE FROM top_scorers`);
     return;
   }
 

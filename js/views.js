@@ -582,10 +582,9 @@ function rankLabel(rank, total) {
 }
 
 function scorerRowHTML(s) {
-  const assists = s.assists > 0 ? ` · ${s.assists} assist.` : '';
   return `<div class="scorer-row">
     <span>${s.player}</span>
-    <span class="scorer-goals">${s.goals} gol${s.goals !== 1 ? 's' : ''}${assists}</span>
+    <span class="scorer-goals">${s.goals} gol${s.goals !== 1 ? 's' : ''}</span>
   </div>`;
 }
 
@@ -850,7 +849,7 @@ export function renderTopScorersRanking(data) {
   if (!el) return;
 
   const scorers = normalizeScorers(data.stats?.topScorers ?? [])
-    .filter((s) => s.goals > 0 || s.assists > 0);
+    .filter((s) => s.goals > 0);
 
   if (!scorers.length) {
     el.innerHTML = '<div class="empty">Nenhum gol registrado ainda</div>';
@@ -860,7 +859,7 @@ export function renderTopScorersRanking(data) {
   el.innerHTML = `
     <table class="standings standings--compact-names">
       <thead>
-        <tr><th>#</th><th>Jogador</th><th>Seleção</th><th>Gols</th><th>Assist.</th></tr>
+        <tr><th>#</th><th>Jogador</th><th>Seleção</th><th>Gols</th></tr>
       </thead>
       <tbody>
         ${scorers.map((s, i) => {
@@ -875,7 +874,6 @@ export function renderTopScorersRanking(data) {
               </div>
             </td>
             <td><span class="standings__pts">${s.goals}</span></td>
-            <td>${s.assists || '–'}</td>
           </tr>`;
         }).join('')}
       </tbody>

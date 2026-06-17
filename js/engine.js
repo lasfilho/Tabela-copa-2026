@@ -383,8 +383,8 @@ export function normalizeScorers(scorers = []) {
 
 export function teamScorers(data, teamId) {
   return normalizeScorers(data.stats?.topScorers ?? [])
-    .filter((s) => s.team === teamId)
-    .sort((a, b) => b.goals - a.goals || b.assists - a.assists || a.player.localeCompare(b.player));
+    .filter((s) => s.team === teamId && s.goals > 0)
+    .sort((a, b) => b.goals - a.goals || a.player.localeCompare(b.player));
 }
 
 /** Gols da seleção para a página de detalhe (inclui gol contra e gols sem artilheiro). */
