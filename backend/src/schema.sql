@@ -132,3 +132,25 @@ CREATE INDEX IF NOT EXISTS idx_team_players_team ON team_players(team_id, shirt_
 
 CREATE INDEX IF NOT EXISTS idx_matches_date ON matches(match_date, match_time);
 CREATE INDEX IF NOT EXISTS idx_match_results_mode ON match_results(mode);
+
+-- Auditoria geral do sistema (todas as ações dos usuários)
+CREATE TABLE IF NOT EXISTS audit_events (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id) ON DELETE SET NULL,
+  actor_name VARCHAR(120),
+  actor_email VARCHAR(180),
+  actor_role VARCHAR(20),
+  action VARCHAR(80) NOT NULL,
+  entity_type VARCHAR(40),
+  entity_id VARCHAR(64),
+  method VARCHAR(10),
+  path VARCHAR(200),
+  status_code SMALLINT,
+  details JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ip VARCHAR(64),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_events_created ON audit_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_events_user ON audit_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_events_action ON audit_events(action);

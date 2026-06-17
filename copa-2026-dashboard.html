@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=44" />
+  <link rel="stylesheet" href="styles.css?v=45" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="data/embedded.js"></script>
 </head>
@@ -53,6 +53,9 @@
         </a>
         <a href="#settings" class="nav-link admin-only-nav" data-section="settings" title="Configurações" hidden>
           <span class="nav-icon">⚙</span><span class="nav-label">Configurações</span>
+        </a>
+        <a href="#audit" class="nav-link admin-only-nav" data-section="audit" title="Auditoria" hidden>
+          <span class="nav-icon">📜</span><span class="nav-label">Auditoria</span>
         </a>
       </nav>
 
@@ -232,6 +235,17 @@
           <div id="settings-content"></div>
         </section>
 
+        <!-- AUDIT (Admin) -->
+        <section class="view" id="view-audit" data-view="audit" hidden>
+          <div class="view-header">
+            <div>
+              <h1>Auditoria</h1>
+              <p class="view-subtitle">Histórico de ações dos usuários no sistema</p>
+            </div>
+          </div>
+          <div id="audit-content"></div>
+        </section>
+
         <!-- CALENDAR -->
         <section class="view" id="view-calendar" data-view="calendar" hidden>
           <div class="view-header">
@@ -283,6 +297,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=26"></script>
+  <script type="module" src="js/app.js?v=27"></script>
 </body>
 </html>

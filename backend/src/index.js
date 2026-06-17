@@ -9,6 +9,7 @@ import stickersRouter from './routes/stickers.js';
 import adminRouter from './routes/admin.js';
 import { initDatabase } from './seed.js';
 import { startScoreSyncWorker } from './score-sync.js';
+import { auditMiddleware } from './audit-middleware.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '../..');
@@ -16,6 +17,8 @@ const PORT = process.env.PORT || 8080;
 
 const app = express();
 app.use(express.json());
+
+app.use('/api', auditMiddleware);
 
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);

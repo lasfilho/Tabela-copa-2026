@@ -36,3 +36,16 @@ export async function changeOwnPassword(currentPassword, newPassword) {
     body: JSON.stringify({ currentPassword, newPassword }),
   });
 }
+
+export async function fetchAuditEvents({ limit = 50, offset = 0, action = '', search = '' } = {}) {
+  const params = new URLSearchParams();
+  params.set('limit', limit);
+  params.set('offset', offset);
+  if (action) params.set('action', action);
+  if (search) params.set('q', search);
+  return request(`/audit?${params.toString()}`);
+}
+
+export async function fetchAuditActions() {
+  return request('/audit/actions');
+}

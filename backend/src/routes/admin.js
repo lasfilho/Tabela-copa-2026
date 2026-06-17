@@ -3,6 +3,7 @@ import { authMiddleware, requireAdmin, requireAuth } from '../auth.js';
 import {
   listUsers, changeOwnPassword, adminResetPassword, deleteUser,
 } from '../admin-service.js';
+import { listAuditEvents, listAuditActions } from '../audit-service.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -46,6 +47,27 @@ router.post('/users/:id/reset-password', requireAdmin, async (req, res, next) =>
     const user = await adminResetPassword(req.user.id, Number(req.params.id), newPassword);
     res.json({ user });
   } catch (err) { handleError(err, res, next); }
+});
+
+/** GET /api/admin/audit — log de auditoria (admin) */
+router.get('/audit', requireAdmin, async (req, res, next) => {
+  try {
+    const result = await listAuditEvents({
+      limit: req.query.limit,
+      offset: req.query.offset,
+      action: req.query.action || null,
+      userId: req.query.userId || null,
+      search: req.query.q?.trim() || null,
+    });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+/** GET /api/admin/audit/actions — ações distintas para filtro */
+router.get('/audit/actions', requireAdmin, async (_req, res, next) => {
+  try {
+    res.json({ items: await listAuditActions() });
+  } catch (err) { next(err); }
 });
 
 export default router;

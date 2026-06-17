@@ -3343,6 +3343,51 @@ body.read-only .score-editor button {
   .settings-section--wide { grid-column: auto; }
 }
 
+/* ============ Auditoria (admin) ============ */
+.audit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.audit-toolbar .stk-input { flex: 1 1 240px; }
+.audit-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.audit-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.audit-table th, .audit-table td {
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.audit-table th { color: var(--text-muted); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
+.audit-table tbody tr:hover { background: var(--surface-2); }
+.audit-when { white-space: nowrap; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; }
+.audit-who { font-weight: 600; }
+.audit-email { color: var(--text-muted); font-size: 0.76rem; }
+.audit-action-label { font-weight: 600; }
+.audit-path { color: var(--text-muted); font-size: 0.74rem; font-family: 'JetBrains Mono', monospace; }
+.audit-details { max-width: 320px; }
+.audit-kv { display: inline-block; margin-right: 0.5rem; font-size: 0.78rem; color: var(--text-muted); }
+.audit-kv b { color: var(--text); font-weight: 600; }
+.audit-ip { white-space: nowrap; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; }
+.audit-tag {
+  font-size: 0.66rem; font-weight: 700;
+  padding: 0.05rem 0.35rem; border-radius: 6px;
+  background: var(--surface-2); color: var(--text-muted);
+  text-transform: uppercase;
+}
+.audit-tag--admin { background: var(--accent-dim); color: var(--accent); }
+.audit-tag--fail { background: rgba(255, 107, 138, 0.15); color: var(--danger); }
+.audit-pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.85rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 /* Ação de encerrar/reabrir jogo (admin, modo real) */
 .match-list-card__status {
   display: flex;

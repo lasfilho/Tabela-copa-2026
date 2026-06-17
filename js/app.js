@@ -24,6 +24,7 @@ import { renderTeamDetailCharts, destroyTeamCharts } from './team-charts.js';
 import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=24';
 import { initStickers, renderStickers, setStickersUser } from './stickers-ui.js?v=2';
 import { renderAdminSettings, initAdminSettingsUI } from './admin-settings.js';
+import { initAudit, renderAudit } from './audit-ui.js?v=1';
 
 const STORAGE_KEY = 'copa2026-ui-cache';
 
@@ -84,6 +85,7 @@ async function init() {
   initAuthUI();
   initAdminUI();
   initStickers(document.getElementById('stickers-content'), { showToast, currentUser: state.user });
+  initAudit(document.getElementById('audit-content'), { showToast, currentUser: state.user });
   initScoreSync();
   startLiveStatusTicker();
   navigate(state.section);
@@ -482,7 +484,7 @@ function initNavigation() {
         updateModeUI('real');
         await reloadData();
       }
-      if (section === 'settings' && !state.permissions.canAccessAdminSettings) {
+      if ((section === 'settings' || section === 'audit') && !state.permissions.canAccessAdminSettings) {
         showToast('Acesso restrito a administradores');
         return;
       }
@@ -501,7 +503,7 @@ function initNavigation() {
 function navigate(section, pushHash = true) {
   if (state.mode === 'pool') return;
 
-  if (section === 'settings' && !state.permissions.canAccessAdminSettings) {
+  if ((section === 'settings' || section === 'audit') && !state.permissions.canAccessAdminSettings) {
     section = 'overview';
   }
 
@@ -838,6 +840,9 @@ function renderAll() {
         showToast,
         currentUser: state.user,
       });
+      break;
+    case 'audit':
+      renderAudit({ currentUser: state.user, showToast });
       break;
   }
 }
