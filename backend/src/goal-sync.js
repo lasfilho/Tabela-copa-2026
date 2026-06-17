@@ -8,7 +8,7 @@ import { query } from './db.js';
 import { recalculatePoolsForMatch } from './pool/pool-ranking.js';
 import { teamIdFromSportsDb } from './sportsdb-team-map.js';
 import { fetchWorldCupJsonGoals, fetchWorldCupJsonMatches } from './worldcup-json.js';
-import { applyGoalCorrections } from './goal-corrections.js';
+import { getEventTimeline } from './sportsdb-fetch.js';
 
 function config() {
   return {
@@ -315,7 +315,7 @@ export async function syncMatchGoalsFromEvent(
     awayScore
   );
 
-  let goals = applyGoalCorrections(matchId, picked.goals, homeId, awayId);
+  let goals = picked.goals;
   const sourceUsed = picked.source;
   goals = reconcileGoalsWithScore(goals, matchId, homeId, awayId, homeScore, awayScore);
 
