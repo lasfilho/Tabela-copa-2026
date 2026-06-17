@@ -21,7 +21,7 @@ import {
   openScoreModal, setPermissions,
 } from './views.js';
 import { renderTeamDetailCharts, destroyTeamCharts } from './team-charts.js';
-import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=24';
+import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=25';
 import { initStickers, renderStickers, setStickersUser } from './stickers-ui.js?v=2';
 import { renderAdminSettings, initAdminSettingsUI } from './admin-settings.js';
 import { initAudit, renderAudit } from './audit-ui.js?v=1';

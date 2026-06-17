@@ -89,6 +89,14 @@ export async function fetchParticipantDetail(poolId, participantId) {
   return request(`/pools/${poolId}/participants/${participantId}`);
 }
 
+export async function fetchPoolCreators() {
+  return request('/pools/admin/creators');
+}
+
+export async function fetchPoolsByCreator(creatorId) {
+  return request(`/pools/admin/creators/${creatorId}/pools`);
+}
+
 export async function fetchPublicPools(page = 1) {
   return request(`/public/pools?page=${page}`);
 }

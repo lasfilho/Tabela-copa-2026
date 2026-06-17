@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { authMiddleware, requireAuth } from '../auth.js';
+import { authMiddleware, requireAuth, requireAdmin } from '../auth.js';
 import {
   listPoolsForUser, createPool, updatePool, deletePool, getPoolById, checkNameAvailable,
   fetchPoolMatches, getPoolScoreRules, RECREATIONAL_DISCLAIMER, fetchEligiblePoolMatches,
+  listPoolCreators, listPoolsByCreator,
 } from '../pool/pool-service.js';
 import { joinPool, createInvite, respondInvite, listInvitesForPool, listMyInvites, joinByInviteToken } from '../pool/pool-join.js';
 import { searchUsersForPoolInvite } from '../pool/pool-invite-users.js';
@@ -75,6 +76,20 @@ router.get('/meta/matches', requireAuth, async (req, res, next) => {
       disclaimer: RECREATIONAL_DISCLAIMER,
       filterNote: 'Jogos agendados com início em pelo menos 1 hora (horário de Brasília)',
     });
+  } catch (err) { next(err); }
+});
+
+/** GET /api/pools/admin/creators — admin: criadores de bolões */
+router.get('/admin/creators', requireAdmin, async (_req, res, next) => {
+  try {
+    res.json({ items: await listPoolCreators() });
+  } catch (err) { next(err); }
+});
+
+/** GET /api/pools/admin/creators/:creatorId/pools — admin: bolões de um criador */
+router.get('/admin/creators/:creatorId/pools', requireAdmin, async (req, res, next) => {
+  try {
+    res.json({ items: await listPoolsByCreator(Number(req.params.creatorId)) });
   } catch (err) { next(err); }
 });
 
@@ -193,7 +208,8 @@ router.get('/:id/participants/:participantId', async (req, res, next) => {
     const detail = await getParticipantDetail(
       Number(req.params.id),
       Number(req.params.participantId),
-      req.user?.id
+      req.user?.id,
+      { isAdmin: req.user?.role === 'admin' }
     );
     res.json(detail);
   } catch (err) { handleError(err, res, next); }

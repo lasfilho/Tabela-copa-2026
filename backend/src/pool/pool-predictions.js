@@ -123,13 +123,13 @@ export async function upsertPrediction(poolId, userId, matchId, homeScore, awayS
   return rows[0];
 }
 
-export async function getParticipantDetail(poolId, participantId, requesterId) {
+export async function getParticipantDetail(poolId, participantId, requesterId, opts = {}) {
   const pool = await getPoolById(poolId);
   if (!pool) throw Object.assign(new Error('Bolão não encontrado'), { status: 404 });
 
   const isPublic = pool.visibility === 'public' && pool.allowPublicListing;
   const isMember = requesterId ? await isParticipant(poolId, requesterId) : null;
-  if (!pool.showParticipants && !isMember && !isPublic) {
+  if (!pool.showParticipants && !isMember && !isPublic && !opts.isAdmin) {
     throw Object.assign(new Error('Detalhes do participante não disponíveis'), { status: 403 });
   }
 

@@ -3343,6 +3343,20 @@ body.read-only .score-editor button {
   .settings-section--wide { grid-column: auto; }
 }
 
+/* ============ Admin: bolões por criador ============ */
+.pool-admin > h2 { margin-bottom: 0.25rem; }
+.pool-creator-card { cursor: pointer; transition: border-color 0.15s, transform 0.1s; }
+.pool-creator-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.pool-creator-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pool-creator-card__stats {
+  display: flex;
+  gap: 1rem;
+  margin: 0.4rem 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.pool-creator-card__stats strong { color: var(--text); }
+
 /* ============ Auditoria (admin) ============ */
 .audit-toolbar {
   display: flex;

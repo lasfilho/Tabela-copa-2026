@@ -5,9 +5,9 @@ import {
   fetchMyPools, checkPoolName, fetchPoolMatchesMeta, createPool, fetchPool, updatePool, deletePool,
   joinPool, fetchPoolPredictions, savePrediction, fetchPoolRanking, fetchPoolRules,
   createPoolInvite, fetchPoolInvites, searchPoolInviteUsers, fetchParticipantDetail,
-  fetchMyInvites, respondToInvite,
+  fetchMyInvites, respondToInvite, fetchPoolCreators, fetchPoolsByCreator,
   POOL_DISCLAIMER, statusLabel, visibilityLabel, inviteStatusLabel, formatDate, formatDateShort,
-} from './pool-client.js?v=22';
+} from './pool-client.js?v=23';
 import { esc, matchTeamsHTML } from './pool-match-display.js?v=22';
 
 const state = {
@@ -20,6 +20,10 @@ const state = {
   matchesMeta: [],
   ranking: null,
   createDraft: null,
+  adminCreatorId: null,
+  adminCreatorName: null,
+  adminView: false,
+  detailReturn: 'list',
 };
 
 let teamMap = {};
@@ -60,21 +64,26 @@ function poolTabsHTML(active) {
     ['create', 'Criar bolão'],
     ['public', 'Ranking público'],
   ];
+  if (currentUser?.role === 'admin') tabs.push(['admin', 'Administração']);
+  const activeAdmin = active === 'admin' || active === 'adminCreator';
   return `<nav class="pool-tabs" aria-label="Bolão">
-    ${tabs.map(([id, label]) =>
-      `<button type="button" class="pool-tab ${active === id ? 'active' : ''}" data-pool-nav="${id}">${label}</button>`
-    ).join('')}
+    ${tabs.map(([id, label]) => {
+      const isActive = id === 'admin' ? activeAdmin : active === id;
+      return `<button type="button" class="pool-tab ${isActive ? 'active' : ''}" data-pool-nav="${id}">${label}</button>`;
+    }).join('')}
   </nav>`;
 }
 
 function detailTabsHTML(active, isCreator) {
-  const tabs = [
-    ['predictions', 'Palpites'],
-    ['ranking', 'Ranking'],
-    ['rules', 'Regras'],
-    ['invites', 'Convites'],
-  ];
-  if (isCreator) tabs.push(['settings', 'Configurações']);
+  const tabs = state.adminView
+    ? [['ranking', 'Ranking'], ['rules', 'Regras']]
+    : [
+        ['predictions', 'Palpites'],
+        ['ranking', 'Ranking'],
+        ['rules', 'Regras'],
+        ['invites', 'Convites'],
+      ];
+  if (!state.adminView && isCreator) tabs.push(['settings', 'Configurações']);
   return `<nav class="pool-subtabs" aria-label="Detalhes do bolão">
     ${tabs.map(([id, label]) =>
       `<button type="button" class="pool-subtab ${active === id ? 'active' : ''}" data-pool-tab="${id}">${label}</button>`
@@ -341,11 +350,17 @@ async function renderDetail(container) {
   }
   const isCreator = currentUser && p.creatorId === currentUser.id;
 
+  if (state.adminView && !['ranking', 'rules'].includes(state.tab)) {
+    state.tab = 'ranking';
+  }
+
+  const backLabel = state.adminView ? '← Bolões do criador' : '← Voltar';
+
   container.innerHTML = `${disclaimerHTML()}
     <div class="pool-detail-head">
-      <button type="button" class="btn btn--ghost btn--sm" data-pool-back>← Voltar</button>
+      <button type="button" class="btn btn--ghost btn--sm" data-pool-back>${backLabel}</button>
       <div>
-        <h2>${esc(p.name)} ${statusBadge(p.status)}</h2>
+        <h2>${esc(p.name)} ${statusBadge(p.status)}${state.adminView ? ' <span class="badge badge--pool">Visão admin</span>' : ''}</h2>
         <p class="pool-detail__meta">${visibilityLabel(p.visibility)} · Criador: ${esc(p.creatorName ?? '—')} · ${p.participantCount} participantes · Adesão até ${formatDate(p.joinDeadline)}</p>
         ${p.visibility === 'link' && p.inviteToken && isCreator
           ? `<p class="pool-share-link"><small>Link do bolão na aba <strong>Convites</strong></small></p>` : ''}
@@ -360,6 +375,75 @@ async function renderDetail(container) {
   else if (state.tab === 'rules') await renderRules(body);
   else if (state.tab === 'invites') await renderInvites(body);
   else if (state.tab === 'settings') await renderSettings(body, p, isCreator);
+}
+
+async function renderAdminCreators(container) {
+  container.innerHTML = `${disclaimerHTML()}${poolTabsHTML('admin')}
+    <div class="pool-loading">Carregando criadores...</div>`;
+  try {
+    const data = await fetchPoolCreators();
+    const items = data.items ?? [];
+    if (!items.length) {
+      container.innerHTML = `${disclaimerHTML()}${poolTabsHTML('admin')}
+        <div class="pool-empty"><p>Nenhum bolão foi criado ainda.</p></div>`;
+      return;
+    }
+    container.innerHTML = `${disclaimerHTML()}${poolTabsHTML('admin')}
+      <section class="pool-admin">
+        <h2>Bolões por criador</h2>
+        <p class="pool-form__hint">Clique em um criador para ver todos os bolões dele e acompanhar ranking e palpites.</p>
+        <div class="pool-grid">
+          ${items.map((c) => `
+            <article class="pool-card pool-creator-card" data-admin-creator="${c.id}" data-admin-creator-name="${esc(c.name)}" role="button" tabindex="0">
+              <div class="pool-card__head"><h3>${esc(c.name)}</h3></div>
+              <p class="pool-card__meta">${esc(c.email ?? '')}</p>
+              <p class="pool-creator-card__stats">
+                <span><strong>${c.poolCount}</strong> bolão(ões)</span>
+                <span><strong>${c.participantTotal}</strong> participações</span>
+              </p>
+              <p class="pool-card__meta">Última atividade: ${formatDate(c.lastActivity)}</p>
+            </article>
+          `).join('')}
+        </div>
+      </section>`;
+  } catch (err) {
+    container.innerHTML = `${disclaimerHTML()}${poolTabsHTML('admin')}
+      <div class="pool-empty"><p>${esc(err.message)}</p></div>`;
+  }
+}
+
+async function renderAdminCreatorPools(container) {
+  const header = `<div class="pool-detail-head">
+    <button type="button" class="btn btn--ghost btn--sm" data-admin-back>← Criadores</button>
+    <div><h2>Bolões de ${esc(state.adminCreatorName ?? '')}</h2></div>
+  </div>`;
+  container.innerHTML = `${disclaimerHTML()}${poolTabsHTML('adminCreator')}${header}
+    <div class="pool-loading">Carregando bolões...</div>`;
+  try {
+    const data = await fetchPoolsByCreator(state.adminCreatorId);
+    const items = data.items ?? [];
+    if (!items.length) {
+      container.innerHTML = `${disclaimerHTML()}${poolTabsHTML('adminCreator')}${header}
+        <div class="pool-empty"><p>Este criador não tem bolões.</p></div>`;
+      return;
+    }
+    container.innerHTML = `${disclaimerHTML()}${poolTabsHTML('adminCreator')}${header}
+      <div class="pool-grid">
+        ${items.map((p) => `
+          <article class="pool-card">
+            <div class="pool-card__head"><h3>${esc(p.name)}</h3>${statusBadge(p.status)}</div>
+            <p class="pool-card__meta">${visibilityLabel(p.visibility)} · ${p.participantCount ?? 0} participantes · ${p.matchCount ?? 0} jogos</p>
+            ${p.description ? `<p class="pool-card__desc">${esc(p.description)}</p>` : ''}
+            <div class="pool-card__actions">
+              <button type="button" class="btn btn--ghost btn--sm" data-admin-open-pool="${p.id}">Acompanhar</button>
+            </div>
+          </article>
+        `).join('')}
+      </div>`;
+  } catch (err) {
+    container.innerHTML = `${disclaimerHTML()}${poolTabsHTML('adminCreator')}${header}
+      <div class="pool-empty"><p>${esc(err.message)}</p></div>`;
+  }
 }
 
 async function renderSettings(container, pool, isCreator) {
@@ -694,6 +778,8 @@ export async function renderPoolApp(container, opts = {}) {
   else if (state.screen === 'create') await renderCreate(container);
   else if (state.screen === 'detail') await renderDetail(container);
   else if (state.screen === 'public') await renderPublicLink(container);
+  else if (state.screen === 'admin') await renderAdminCreators(container);
+  else if (state.screen === 'adminCreator') await renderAdminCreatorPools(container);
 }
 
 export function initPoolUI(container, opts = {}) {
@@ -716,6 +802,7 @@ export function initPoolUI(container, opts = {}) {
       state.screen = nav.dataset.poolNav;
       state.poolId = null;
       state.rankingPage = 1;
+      state.adminView = false;
       await renderPoolApp(container, poolOpts());
       return;
     }
@@ -726,6 +813,36 @@ export function initPoolUI(container, opts = {}) {
       state.poolId = Number(open.dataset.openPool);
       state.tab = 'predictions';
       state.rankingPage = 1;
+      state.adminView = false;
+      state.detailReturn = 'list';
+      await renderPoolApp(container, poolOpts());
+      return;
+    }
+
+    const adminCreator = e.target.closest('[data-admin-creator]');
+    if (adminCreator) {
+      state.screen = 'adminCreator';
+      state.adminCreatorId = Number(adminCreator.dataset.adminCreator);
+      state.adminCreatorName = adminCreator.dataset.adminCreatorName ?? '';
+      await renderPoolApp(container, poolOpts());
+      return;
+    }
+
+    const adminBack = e.target.closest('[data-admin-back]');
+    if (adminBack) {
+      state.screen = 'admin';
+      await renderPoolApp(container, poolOpts());
+      return;
+    }
+
+    const adminOpen = e.target.closest('[data-admin-open-pool]');
+    if (adminOpen) {
+      state.screen = 'detail';
+      state.poolId = Number(adminOpen.dataset.adminOpenPool);
+      state.tab = 'ranking';
+      state.rankingPage = 1;
+      state.adminView = true;
+      state.detailReturn = 'adminCreator';
       await renderPoolApp(container, poolOpts());
       return;
     }
@@ -753,8 +870,9 @@ export function initPoolUI(container, opts = {}) {
 
     const back = e.target.closest('[data-pool-back]');
     if (back) {
-      state.screen = 'list';
-      state.poolId = null;
+      state.screen = state.detailReturn === 'adminCreator' ? 'adminCreator' : 'list';
+      state.adminView = false;
+      if (state.screen !== 'adminCreator') state.poolId = null;
       await renderPoolApp(container, poolOpts());
       return;
     }
@@ -936,6 +1054,10 @@ export function resetPoolUI() {
   state.rankingPage = 1;
   state.createDraft = null;
   state.matchesMeta = [];
+  state.adminCreatorId = null;
+  state.adminCreatorName = null;
+  state.adminView = false;
+  state.detailReturn = 'list';
 }
 
 export function openPoolById(poolId, tab = 'predictions') {

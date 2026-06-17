@@ -140,6 +140,43 @@ export async function listPoolsForUser(userId) {
   return rows.map(mapPoolRow);
 }
 
+/** Admin: lista criadores de bolões com contagens. */
+export async function listPoolCreators() {
+  const { rows } = await query(
+    `SELECT u.id, u.name, u.email,
+            COUNT(p.id)::int AS pool_count,
+            COALESCE(SUM((SELECT COUNT(*) FROM pool_participants pp WHERE pp.pool_id = p.id)), 0)::int AS participant_total,
+            MAX(p.updated_at) AS last_activity
+     FROM users u
+     JOIN pools p ON p.creator_id = u.id
+     GROUP BY u.id, u.name, u.email
+     ORDER BY pool_count DESC, u.name ASC`
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    poolCount: r.pool_count,
+    participantTotal: r.participant_total,
+    lastActivity: r.last_activity,
+  }));
+}
+
+/** Admin: lista todos os bolões de um criador. */
+export async function listPoolsByCreator(creatorId) {
+  const { rows } = await query(
+    `SELECT p.*, u.name AS creator_name,
+            (SELECT COUNT(*)::int FROM pool_participants pp WHERE pp.pool_id = p.id) AS participant_count,
+            (SELECT COUNT(*)::int FROM pool_matches pm WHERE pm.pool_id = p.id) AS match_count
+     FROM pools p
+     JOIN users u ON u.id = p.creator_id
+     WHERE p.creator_id = $1
+     ORDER BY p.updated_at DESC`,
+    [creatorId]
+  );
+  return rows.map(mapPoolRow);
+}
+
 export async function listPublicPools({ page = 1, limit = 20 } = {}) {
   const offset = (page - 1) * limit;
   const { rows } = await query(
