@@ -15,17 +15,43 @@ function showError(id, msg) {
   el.hidden = !msg;
 }
 
-document.querySelectorAll('.auth-tab').forEach((tab) => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.auth-tab').forEach((t) => t.classList.toggle('active', t === tab));
-    document.querySelectorAll('.auth-form').forEach((f) => {
-      const active = f.dataset.panel === tab.dataset.tab;
-      f.classList.toggle('active', active);
-      f.hidden = !active;
-    });
-    showError('login-error', '');
-    showError('register-error', '');
+const choiceView = document.getElementById('auth-choice');
+const formsView = document.getElementById('auth-forms');
+
+function selectMode(mode) {
+  document.querySelectorAll('.auth-tab').forEach((t) => {
+    t.classList.toggle('active', t.dataset.tab === mode);
   });
+  document.querySelectorAll('.auth-form').forEach((f) => {
+    const active = f.dataset.panel === mode;
+    f.classList.toggle('active', active);
+    f.hidden = !active;
+  });
+  showError('login-error', '');
+  showError('register-error', '');
+  const firstInput = document.querySelector(`.auth-form[data-panel="${mode}"] input`);
+  firstInput?.focus();
+}
+
+function showForms(mode) {
+  selectMode(mode);
+  choiceView.hidden = true;
+  formsView.hidden = false;
+}
+
+function showChoice() {
+  formsView.hidden = true;
+  choiceView.hidden = false;
+}
+
+document.querySelectorAll('[data-choice]').forEach((btn) => {
+  btn.addEventListener('click', () => showForms(btn.dataset.choice));
+});
+
+document.getElementById('auth-back')?.addEventListener('click', showChoice);
+
+document.querySelectorAll('.auth-tab').forEach((tab) => {
+  tab.addEventListener('click', () => selectMode(tab.dataset.tab));
 });
 
 document.getElementById('form-login').addEventListener('submit', async (e) => {

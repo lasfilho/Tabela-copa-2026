@@ -2711,6 +2711,48 @@ body[data-active-mode="simulation"] #sim-clear-btn:not([hidden]):hover {
 .auth-card__brand strong { display: block; }
 .auth-card__brand span { font-size: 0.8rem; color: var(--text-muted); }
 
+.auth-choice__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+}
+
+.auth-choice__subtitle {
+  margin: 0 0 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.auth-choice__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auth-choice__btn {
+  width: 100%;
+  padding: 0.8rem;
+  font-size: 1rem;
+}
+
+.auth-choice__back {
+  display: block;
+  margin: 1.25rem 0 0;
+  text-align: center;
+}
+
+.auth-forms__back {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.auth-card__hint--global {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
 .auth-tabs {
   display: flex;
   gap: 0.35rem;

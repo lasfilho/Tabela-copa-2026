@@ -7,12 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=6" />
+  <link rel="stylesheet" href="styles.css?v=7" />
 </head>
 <body class="auth-page">
   <div class="auth-bg" aria-hidden="true"></div>
   <main class="auth-card">
-    <a href="/" class="auth-card__back">← Voltar ao dashboard</a>
     <div class="auth-card__brand">
       <span class="brand-mark">26</span>
       <div>
@@ -21,27 +20,44 @@
       </div>
     </div>
 
-    <div class="auth-tabs" role="tablist">
-      <button type="button" class="auth-tab active" data-tab="login" role="tab">Entrar</button>
-      <button type="button" class="auth-tab" data-tab="register" role="tab">Cadastrar</button>
-    </div>
+    <!-- Tela inicial: escolha entre Entrar e Cadastrar -->
+    <section class="auth-choice" id="auth-choice">
+      <h1 class="auth-choice__title">Bem-vindo</h1>
+      <p class="auth-choice__subtitle">Entre na sua conta ou cadastre-se para participar dos bolões.</p>
+      <div class="auth-choice__actions">
+        <button type="button" class="btn btn--primary auth-choice__btn" data-choice="login">Entrar</button>
+        <button type="button" class="btn btn--ghost auth-choice__btn" data-choice="register">Cadastrar</button>
+      </div>
+      <a href="/" class="auth-card__back auth-choice__back">← Voltar ao dashboard</a>
+      <p class="auth-card__hint">Visitantes acessam o dashboard em modo Real somente leitura, sem cadastro.</p>
+    </section>
 
-    <form id="form-login" class="auth-form active" data-panel="login">
-      <label>E-mail<input type="email" name="email" required autocomplete="email" placeholder="seu@email.com" /></label>
-      <label>Senha<input type="password" name="password" required autocomplete="current-password" minlength="6" /></label>
-      <p class="auth-form__error" id="login-error" hidden></p>
-      <button type="submit" class="btn btn--primary auth-form__submit">Entrar</button>
-    </form>
+    <!-- Tela de formulários: aparece após a escolha -->
+    <section class="auth-forms" id="auth-forms" hidden>
+      <button type="button" class="auth-card__back auth-forms__back" id="auth-back">← Voltar</button>
 
-    <form id="form-register" class="auth-form" data-panel="register" hidden>
-      <label>Nome<input type="text" name="name" required autocomplete="name" placeholder="Seu nome" /></label>
-      <label>E-mail<input type="email" name="email" required autocomplete="email" placeholder="seu@email.com" /></label>
-      <label>Senha<input type="password" name="password" required autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres" /></label>
-      <p class="auth-form__error" id="register-error" hidden></p>
-      <button type="submit" class="btn btn--primary auth-form__submit">Criar conta</button>
-    </form>
+      <div class="auth-tabs" role="tablist">
+        <button type="button" class="auth-tab active" data-tab="login" role="tab">Entrar</button>
+        <button type="button" class="auth-tab" data-tab="register" role="tab">Cadastrar</button>
+      </div>
 
-    <p class="auth-card__hint">Visitantes acessam o dashboard em modo Real somente leitura, sem cadastro.</p>
+      <form id="form-login" class="auth-form active" data-panel="login">
+        <label>E-mail<input type="email" name="email" required autocomplete="email" placeholder="seu@email.com" /></label>
+        <label>Senha<input type="password" name="password" required autocomplete="current-password" minlength="6" /></label>
+        <p class="auth-form__error" id="login-error" hidden></p>
+        <button type="submit" class="btn btn--primary auth-form__submit">Entrar</button>
+      </form>
+
+      <form id="form-register" class="auth-form" data-panel="register" hidden>
+        <label>Nome<input type="text" name="name" required autocomplete="name" placeholder="Seu nome" /></label>
+        <label>E-mail<input type="email" name="email" required autocomplete="email" placeholder="seu@email.com" /></label>
+        <label>Senha<input type="password" name="password" required autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres" /></label>
+        <p class="auth-form__error" id="register-error" hidden></p>
+        <button type="submit" class="btn btn--primary auth-form__submit">Criar conta</button>
+      </form>
+    </section>
+
+    <p class="auth-card__hint auth-card__hint--global">Bolão recreativo, sem apostas ou prêmios.</p>
   </main>
   <div class="toast" id="toast" role="status"></div>
   <script type="module" src="js/auth-page.js"></script>
