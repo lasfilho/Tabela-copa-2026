@@ -556,6 +556,46 @@ function updateStatusBarVisibility() {
   bar.hidden = !show;
 }
 
+function updateApiMeter(sportsApi, rateLimited) {
+  const wrap = document.getElementById('sync-api-meter');
+  const label = document.getElementById('sync-api-label');
+  const fill = document.getElementById('sync-api-fill');
+  const bar = wrap?.querySelector('.status-bar__api-bar');
+  if (!wrap || !label || !fill) return;
+
+  const metrics = sportsApi?.metrics;
+  if (!metrics) {
+    wrap.hidden = true;
+    return;
+  }
+
+  const used = metrics.requestsLastMinute ?? 0;
+  const limit = metrics.limitPerMinute ?? 28;
+  const pct = Math.min(100, metrics.utilizationPct ?? 0);
+
+  wrap.hidden = false;
+  label.textContent = `API ${used}/${limit}`;
+  fill.style.width = `${pct}%`;
+
+  wrap.classList.remove('status-bar__api-meter--warn', 'status-bar__api-meter--danger');
+  if (rateLimited || sportsApi?.rateLimited) {
+    wrap.classList.add('status-bar__api-meter--danger');
+  } else if (pct >= 50) {
+    wrap.classList.add('status-bar__api-meter--warn');
+  }
+
+  if (bar) {
+    bar.setAttribute('aria-valuenow', String(used));
+    bar.setAttribute('aria-valuemax', String(limit));
+    bar.setAttribute('aria-label', `TheSportsDB: ${used} de ${limit} requisições no último minuto`);
+  }
+
+  const parts = [`${used}/${limit} req/min (${pct}%)`];
+  if (metrics.cacheHits) parts.push(`${metrics.cacheHits} cache hits`);
+  if (metrics.staleFallbacks) parts.push(`${metrics.staleFallbacks} fallbacks stale`);
+  wrap.title = `TheSportsDB — ${parts.join(' · ')}`;
+}
+
 function updateSyncUI(status) {
   const toggle = document.getElementById('sync-toggle');
   const label = document.getElementById('sync-toggle-label');
@@ -583,13 +623,13 @@ function updateSyncUI(status) {
     statusText.textContent = `Erro na sync: ${status.lastError}`;
   } else if (state.syncEnabled) {
     statusBar.classList.add('status-bar--sync-on');
-    const api = status?.sportsApi?.metrics;
-    const extra = api?.nearLimit ? ` · API ${api.utilizationPct}% do limite/min` : '';
-    statusText.textContent = `Sync ativo · última: ${formatSyncTime(status.lastOkAt)}${extra}`;
+    statusText.textContent = `Sync ativo · última: ${formatSyncTime(status.lastOkAt)}`;
   } else {
     statusBar.classList.add('status-bar--sync-off');
     statusText.textContent = 'Sync automático desligado';
   }
+
+  updateApiMeter(status?.sportsApi, Boolean(status?.rateLimited));
 }
 
 async function refreshSyncStatus(reloadIfUpdated = false) {

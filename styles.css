@@ -427,6 +427,44 @@ body[data-section="pool"] .status-bar {
 .status-bar--sync-on .status-bar__sync-text { color: var(--accent); }
 .status-bar--sync-error .status-bar__sync-text { color: var(--danger); }
 
+.status-bar__api-meter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.status-bar__api-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.status-bar__api-bar {
+  width: 3.5rem;
+  height: 0.35rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.status-bar__api-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s ease, background 0.2s ease;
+}
+
+.status-bar__api-meter--warn .status-bar__api-fill { background: #e6b800; }
+.status-bar__api-meter--warn .status-bar__api-label { color: #e6b800; }
+
+.status-bar__api-meter--danger .status-bar__api-fill { background: var(--danger); }
+.status-bar__api-meter--danger .status-bar__api-label { color: var(--danger); }
+
 .status-bar .sync-toggle.active {
   color: var(--accent);
   border-color: rgba(61, 255, 170, 0.35);

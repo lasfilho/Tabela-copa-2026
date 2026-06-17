@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=46" />
+  <link rel="stylesheet" href="styles.css?v=47" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="data/embedded.js"></script>
 </head>
@@ -99,6 +99,12 @@
         <span class="status-bar__phase" id="status-phase-text">Fase de grupos</span>
         <div class="status-bar__sync admin-only" id="status-sync-wrap" hidden>
           <span class="status-bar__sync-text" id="sync-status-text" aria-live="polite"></span>
+          <div class="status-bar__api-meter" id="sync-api-meter" hidden title="Uso da API TheSportsDB no último minuto">
+            <span class="status-bar__api-label" id="sync-api-label">API 0/28</span>
+            <div class="status-bar__api-bar" role="meter" aria-valuemin="0" aria-valuemax="28" aria-valuenow="0" aria-label="Uso da API TheSportsDB">
+              <div class="status-bar__api-fill" id="sync-api-fill"></div>
+            </div>
+          </div>
           <button type="button" class="btn btn--ghost btn--sm sync-toggle" id="sync-toggle" title="Ligar sync automático (TheSportsDB)" aria-label="Sync desligado">
             Auto ↻
           </button>
@@ -297,6 +303,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=29"></script>
+  <script type="module" src="js/app.js?v=30"></script>
 </body>
 </html>
