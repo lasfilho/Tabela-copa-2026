@@ -3,6 +3,7 @@ import { query } from '../db.js';
 import { TOURNAMENT } from '../seed.js';
 import { resolveMatchStatus, finalizeStaleLiveResults } from '../match-status.js';
 import { getSyncStatus, setSyncEnabled, runScoreSync } from '../score-sync.js';
+import { getSportsApiStatus } from '../sportsdb-fetch.js';
 import { authMiddleware, canWriteScores, requireAdmin } from '../auth.js';
 import { recalculatePoolsForMatch } from '../pool/pool-ranking.js';
 
@@ -335,6 +336,15 @@ router.post('/sync/run', requireAdmin, async (_req, res, next) => {
   try {
     const result = await runScoreSync();
     res.json({ ...result, ...(await getSyncStatus()) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/sync/metrics — observabilidade TheSportsDB (admin) */
+router.get('/sync/metrics', requireAdmin, async (_req, res, next) => {
+  try {
+    res.json(getSportsApiStatus());
   } catch (err) {
     next(err);
   }

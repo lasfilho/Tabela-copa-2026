@@ -53,6 +53,9 @@ let prefsTimer = null;
 let liveStatusTimer = null;
 let syncPollTimer = null;
 let lastSyncOkAt = null;
+let manualSyncCooldownUntil = 0;
+const SYNC_POLL_MS = 90_000;
+const MANUAL_SYNC_COOLDOWN_MS = 30_000;
 
 async function init() {
   loadLocalUI();
@@ -580,7 +583,9 @@ function updateSyncUI(status) {
     statusText.textContent = `Erro na sync: ${status.lastError}`;
   } else if (state.syncEnabled) {
     statusBar.classList.add('status-bar--sync-on');
-    statusText.textContent = `Sync ativo · última: ${formatSyncTime(status.lastOkAt)}`;
+    const api = status?.sportsApi?.metrics;
+    const extra = api?.nearLimit ? ` · API ${api.utilizationPct}% do limite/min` : '';
+    statusText.textContent = `Sync ativo · última: ${formatSyncTime(status.lastOkAt)}${extra}`;
   } else {
     statusBar.classList.add('status-bar--sync-off');
     statusText.textContent = 'Sync automático desligado';
@@ -608,13 +613,33 @@ async function refreshSyncStatus(reloadIfUpdated = false) {
 
 function startSyncPoll() {
   if (syncPollTimer) clearInterval(syncPollTimer);
-  syncPollTimer = setInterval(() => refreshSyncStatus(true), 60000);
+  if (document.hidden) return;
+  syncPollTimer = setInterval(() => refreshSyncStatus(true), SYNC_POLL_MS);
+}
+
+function stopSyncPoll() {
+  if (syncPollTimer) {
+    clearInterval(syncPollTimer);
+    syncPollTimer = null;
+  }
+}
+
+function initSyncVisibility() {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopSyncPoll();
+    } else if (state.permissions.canManageSync) {
+      refreshSyncStatus(true);
+      startSyncPoll();
+    }
+  });
 }
 
 function initScoreSync() {
   if (!state.permissions.canManageSync) return;
   refreshSyncStatus(false);
   startSyncPoll();
+  initSyncVisibility();
 
   document.getElementById('sync-toggle')?.addEventListener('click', async () => {
     if (state.offline) {
@@ -653,6 +678,12 @@ async function runManualScoreSync() {
     showToast('Somente administradores podem sincronizar');
     return;
   }
+  if (Date.now() < manualSyncCooldownUntil) {
+    const sec = Math.ceil((manualSyncCooldownUntil - Date.now()) / 1000);
+    showToast(`Aguarde ${sec}s antes de sincronizar novamente`);
+    return;
+  }
+  manualSyncCooldownUntil = Date.now() + MANUAL_SYNC_COOLDOWN_MS;
   showToast('Sincronizando placares...');
   try {
     const result = await runScoreSyncNow();

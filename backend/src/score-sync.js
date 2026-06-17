@@ -10,8 +10,10 @@ import {
   shouldResyncMatchGoals,
 } from './goal-sync.js';
 import {
-  fetchSportsDbJson,
+  getSeasonEvents,
   getSportsDbRateLimitUntil,
+  isSportsDbRateLimited,
+  getSportsApiStatus,
 } from './sportsdb-fetch.js';
 import { finalizeStaleLiveResults } from './match-status.js';
 
@@ -77,12 +79,15 @@ async function ensureSyncPreferenceDefault() {
 }
 
 async function fetchSeasonEvents() {
-  const { apiKey } = config();
-  const url = `https://www.thesportsdb.com/api/v1/json/${apiKey}/eventsseason.php?id=${LEAGUE_ID}&s=${SEASON}`;
-  const result = await fetchSportsDbJson(url);
+  const result = await getSeasonEvents();
   if (result.rateLimited) return { rateLimited: true, events: [] };
   if (!result.ok) throw new Error(result.error);
-  return { events: result.data.events ?? [] };
+  if (result.stale) {
+    console.warn('[sync] usando cache stale de eventsseason (API indisponível ou rate limit)');
+  } else if (result.fromCache) {
+    console.log('[sync] eventsseason do cache (sem nova chamada à API)');
+  }
+  return { events: result.events ?? [] };
 }
 
 async function findMatchId(homeId, awayId) {
@@ -129,15 +134,19 @@ async function countMatchGoals(matchId) {
 }
 
 async function maybeSyncGoals(
-  matchId, idEvent, idApiFootball, homeId, awayId, homeScore, awayScore, matchDate, status, becameFinished
+  matchId, idEvent, idApiFootball, homeId, awayId, homeScore, awayScore, matchDate, status, becameFinished,
+  budget
 ) {
   if (status !== 'finished') return 0;
+  if (isSportsDbRateLimited()) return 0;
+  if (budget && budget.remaining <= 0) return 0;
 
   if (!becameFinished && !(await shouldResyncMatchGoals(matchId, homeId, awayId, homeScore, awayScore))) {
     return 0;
   }
 
   try {
+    if (budget) budget.remaining -= 1;
     const result = await syncMatchGoalsFromEvent(
       matchId, idEvent, homeId, awayId, homeScore, awayScore, idApiFootball, matchDate
     );
@@ -224,6 +233,9 @@ export async function runScoreSync() {
   let liveCount = 0;
   let goalsSynced = 0;
   const unmatched = [];
+  const timelineBudget = {
+    remaining: Number(process.env.SYNC_MAX_TIMELINE_PER_RUN || 8),
+  };
 
   try {
     const { rateLimited, events } = await fetchSeasonEvents();
@@ -267,7 +279,8 @@ export async function runScoreSync() {
       if (!scoreChanged) {
         if (status === 'finished') {
           goalsSynced += await maybeSyncGoals(
-            matchId, ev.idEvent, ev.idAPIfootball, homeId, awayId, home, away, matchDate, status, becameFinished
+            matchId, ev.idEvent, ev.idAPIfootball, homeId, awayId, home, away, matchDate, status, becameFinished,
+            timelineBudget
           );
         }
         skipped += 1;
@@ -287,7 +300,8 @@ export async function runScoreSync() {
 
       if (status === 'finished') {
         goalsSynced += await maybeSyncGoals(
-          matchId, ev.idEvent, ev.idAPIfootball, homeId, awayId, home, away, matchDate, status, true
+          matchId, ev.idEvent, ev.idAPIfootball, homeId, awayId, home, away, matchDate, status, true,
+          timelineBudget
         );
       }
     }
@@ -315,6 +329,7 @@ export async function runScoreSync() {
       live: liveCount,
       goalsSynced,
       unmatched: unmatched.length,
+      timelineBudgetUsed: Number(process.env.SYNC_MAX_TIMELINE_PER_RUN || 8) - timelineBudget.remaining,
       at: state.lastOkAt,
     };
   } catch (err) {
@@ -360,6 +375,7 @@ export async function getSyncStatus() {
     source: 'TheSportsDB',
     supportsLive: true,
     supportsGoalScorers: true,
+    sportsApi: getSportsApiStatus(),
     goalSources: [
       'openfootball/worldcup.json',
       'TheSportsDB lookuptimeline.php',

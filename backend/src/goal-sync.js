@@ -7,7 +7,7 @@
 import { query } from './db.js';
 import { teamIdFromSportsDb } from './sportsdb-team-map.js';
 import { fetchWorldCupJsonGoals } from './worldcup-json.js';
-import { fetchSportsDbJson } from './sportsdb-fetch.js';
+import { getEventTimeline } from './sportsdb-fetch.js';
 
 function config() {
   return {
@@ -50,12 +50,10 @@ function countScoringTotals(goals, homeId, awayId) {
   return { home, away };
 }
 
-export async function fetchEventTimeline(idEvent) {
-  const { sportsDbKey } = config();
-  const url = `https://www.thesportsdb.com/api/v1/json/${sportsDbKey}/lookuptimeline.php?id=${idEvent}`;
-  const result = await fetchSportsDbJson(url, { timeout: 20000 });
+export async function fetchEventTimeline(idEvent, { isLive = false } = {}) {
+  const result = await getEventTimeline(idEvent, { isLive });
   if (result.rateLimited || !result.ok) return [];
-  return result.data.timeline ?? [];
+  return result.timeline ?? [];
 }
 
 function parseSportsDbGoals(timeline, homeId, awayId) {

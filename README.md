@@ -36,6 +36,8 @@ Resumo rápido:
 
 Variáveis documentadas em [`.env.example`](.env.example).
 
+**Integração TheSportsDB** (cache, rate limit, sync, troubleshooting): **[docs/sportsdb-integration.md](docs/sportsdb-integration.md)**
+
 ## Arquitetura
 
 ```

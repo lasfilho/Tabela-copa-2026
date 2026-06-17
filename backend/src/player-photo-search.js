@@ -2,7 +2,7 @@
  * Busca fotos de jogadores no TheSportsDB com desambiguação por clube.
  */
 import { normalizeTeamName } from './sportsdb-team-map.js';
-import { markSportsDbRateLimited } from './sportsdb-fetch.js';
+import { searchPlayers } from './sportsdb-fetch.js';
 
 const DISPLAY_ALIASES = {
   'neymar jr': 'Neymar',
@@ -32,10 +32,6 @@ const DISPLAY_ALIASES = {
   'j david': 'Jonathan David',
   'de fougerolles': 'Luc de Fougerolles',
 };
-
-function config() {
-  return { apiKey: process.env.SPORTS_API_KEY || '123' };
-}
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -126,19 +122,10 @@ function scoreResult(entry, player, query) {
 }
 
 async function fetchSearch(query) {
-  const { apiKey } = config();
-  const url = `https://www.thesportsdb.com/api/v1/json/${apiKey}/searchplayers.php?p=${encodeURIComponent(query)}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
-  if (res.status === 429) return { rateLimited: true, players: [] };
-  if (!res.ok) return { players: [] };
-  const text = await res.text();
-  if (text.startsWith('<!')) return { players: [] };
-  try {
-    const data = JSON.parse(text);
-    return { players: data.player ?? [] };
-  } catch {
-    return { players: [] };
-  }
+  const result = await searchPlayers(query);
+  if (result.rateLimited) return { rateLimited: true, players: [] };
+  if (!result.ok) return { players: [] };
+  return { players: result.players ?? [] };
 }
 
 export async function searchPlayerPhoto(player, options = {}) {
@@ -147,7 +134,6 @@ export async function searchPlayerPhoto(player, options = {}) {
 
   const { players, rateLimited } = await fetchSearch(query);
   if (rateLimited) {
-    markSportsDbRateLimited(15);
     return { rateLimited: true };
   }
   if (!players.length) return null;
