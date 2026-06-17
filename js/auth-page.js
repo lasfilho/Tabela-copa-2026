@@ -9,11 +9,15 @@ if (getToken()) {
   window.location.href = redirect || (pending ? `/boloes?join=${encodeURIComponent(pending)}&auto=1` : '/');
 }
 
-const choiceView = document.getElementById('auth-choice');
-const formsView = document.getElementById('auth-forms');
+const screens = {
+  choice: document.getElementById('auth-choice'),
+  login: document.getElementById('auth-login-screen'),
+  register: document.getElementById('auth-register-screen'),
+};
 
 function showError(id, msg) {
   const el = document.getElementById(id);
+  if (!el) return;
   el.textContent = msg;
   el.hidden = !msg;
 }
@@ -25,85 +29,75 @@ function showNotice(id, msg) {
   el.hidden = !msg;
 }
 
-function clearMessages() {
+function clearLoginMessages() {
   showError('login-error', '');
-  showError('register-error', '');
   showNotice('login-notice', '');
+  const help = document.getElementById('login-help');
+  if (help) help.hidden = true;
+}
+
+function clearRegisterMessages() {
+  showError('register-error', '');
   showNotice('register-notice', '');
 }
 
-/** Mostra apenas o formulário do modo escolhido (login ou register). */
-function selectMode(mode, { keepMessages = false } = {}) {
-  if (!keepMessages) clearMessages();
-  document.querySelectorAll('.auth-form').forEach((f) => {
-    const active = f.dataset.panel === mode;
-    f.classList.toggle('active', active);
-    f.hidden = !active;
-  });
-  const firstEmpty = [...document.querySelectorAll(`.auth-form[data-panel="${mode}"] input`)]
-    .find((inp) => !inp.value);
-  (firstEmpty ?? document.querySelector(`.auth-form[data-panel="${mode}"] input`))?.focus();
+/** Exibe uma única tela por vez (choice | login | register). */
+function showScreen(name) {
+  for (const [key, el] of Object.entries(screens)) {
+    if (el) el.hidden = key !== name;
+  }
+  if (name === 'login') {
+    clearLoginMessages();
+    screens.login?.querySelector('input[name="email"]')?.focus();
+  } else if (name === 'register') {
+    clearRegisterMessages();
+    screens.register?.querySelector('input[name="name"]')?.focus();
+  }
 }
 
-function showForms(mode) {
-  selectMode(mode);
-  choiceView.hidden = true;
-  formsView.hidden = false;
-}
-
-function showChoice() {
-  clearMessages();
-  formsView.hidden = true;
-  choiceView.hidden = false;
-}
-
-document.querySelectorAll('[data-choice]').forEach((btn) => {
-  btn.addEventListener('click', () => showForms(btn.dataset.choice));
-});
-
-document.getElementById('auth-back')?.addEventListener('click', showChoice);
-
-document.querySelectorAll('[data-switch]').forEach((btn) => {
-  btn.addEventListener('click', () => selectMode(btn.dataset.switch));
+document.querySelectorAll('[data-go]').forEach((btn) => {
+  btn.addEventListener('click', () => showScreen(btn.dataset.go));
 });
 
 document.getElementById('form-login').addEventListener('submit', async (e) => {
   e.preventDefault();
-  clearMessages();
+  clearLoginMessages();
   const fd = new FormData(e.target);
   const email = fd.get('email');
   try {
     await login(email, fd.get('password'));
     const pending = takePendingJoinToken();
     window.location.href = redirect || (pending ? `/boloes?join=${encodeURIComponent(pending)}&auto=1` : '/');
-  } catch (err) {
-    // E-mail não cadastrado: leva para o cadastro com aviso.
-    if (err.status === 404 || err.data?.notRegistered) {
-      const regEmail = document.querySelector('#form-register input[name="email"]');
-      if (regEmail) regEmail.value = email ?? '';
-      selectMode('register', { keepMessages: true });
-      showNotice('register-notice', 'E-mail não cadastrado. Crie sua conta para continuar.');
-      return;
-    }
-    showError('login-error', err.message);
+  } catch {
+    showError('login-error', 'E-mail ou senha incorretos.');
+    const help = document.getElementById('login-help');
+    if (help) help.hidden = false;
   }
 });
 
 document.getElementById('form-register').addEventListener('submit', async (e) => {
   e.preventDefault();
-  clearMessages();
+  clearRegisterMessages();
   const fd = new FormData(e.target);
   const email = fd.get('email');
   try {
     await register(fd.get('name'), email, fd.get('password'));
-    // Não faz login automático: envia para a tela de login.
     clearAuth();
     e.target.reset();
-    const loginEmail = document.querySelector('#form-login input[name="email"]');
+    const loginEmail = screens.login?.querySelector('input[name="email"]');
     if (loginEmail) loginEmail.value = email ?? '';
-    selectMode('login', { keepMessages: true });
+    showScreen('login');
     showNotice('login-notice', 'Cadastro realizado! Faça login para entrar.');
   } catch (err) {
     showError('register-error', err.message);
   }
+});
+
+// Ao ir para cadastro a partir do link de erro no login, preserva o e-mail digitado.
+document.querySelectorAll('[data-go="register"]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const loginEmail = screens.login?.querySelector('input[name="email"]')?.value;
+    const regEmail = screens.register?.querySelector('input[name="email"]');
+    if (loginEmail && regEmail && !regEmail.value) regEmail.value = loginEmail;
+  });
 });

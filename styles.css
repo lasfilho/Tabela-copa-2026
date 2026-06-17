@@ -2748,6 +2748,27 @@ body[data-active-mode="simulation"] #sim-clear-btn:not([hidden]):hover {
   padding: 0;
 }
 
+.auth-screen[hidden],
+.auth-form[hidden] {
+  display: none !important;
+}
+
+.auth-screen__back {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+
+.auth-form__help {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
 .auth-card__hint--global {
   border-top: 1px solid var(--border);
   padding-top: 1rem;

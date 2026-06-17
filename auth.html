@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=9" />
 </head>
 <body class="auth-page">
   <div class="auth-bg" aria-hidden="true"></div>
@@ -20,33 +20,39 @@
       </div>
     </div>
 
-    <!-- Tela inicial: escolha entre Entrar e Cadastrar -->
-    <section class="auth-choice" id="auth-choice">
+    <!-- Tela 1: escolha -->
+    <section class="auth-screen" id="auth-choice">
       <h1 class="auth-choice__title">Bem-vindo</h1>
       <p class="auth-choice__subtitle">Entre na sua conta ou cadastre-se para participar dos bolões.</p>
       <div class="auth-choice__actions">
-        <button type="button" class="btn btn--primary auth-choice__btn" data-choice="login">Entrar</button>
-        <button type="button" class="btn btn--ghost auth-choice__btn" data-choice="register">Cadastrar</button>
+        <button type="button" class="btn btn--primary auth-choice__btn" data-go="login">Entrar</button>
+        <button type="button" class="btn btn--ghost auth-choice__btn" data-go="register">Cadastrar</button>
       </div>
       <a href="/" class="auth-card__back auth-choice__back">← Voltar ao dashboard</a>
       <p class="auth-card__hint">Visitantes acessam o dashboard em modo Real somente leitura, sem cadastro.</p>
     </section>
 
-    <!-- Tela de login: aparece após escolher "Entrar" -->
-    <section class="auth-forms" id="auth-forms" hidden>
-      <button type="button" class="auth-card__back auth-forms__back" id="auth-back">← Voltar</button>
-
-      <form id="form-login" class="auth-form active" data-panel="login">
+    <!-- Tela 2: somente login -->
+    <section class="auth-screen" id="auth-login-screen" hidden>
+      <button type="button" class="auth-card__back auth-screen__back" data-go="choice">← Voltar</button>
+      <form id="form-login" class="auth-form">
         <h2 class="auth-form__title">Entrar</h2>
         <p class="auth-form__notice" id="login-notice" hidden></p>
         <label>E-mail<input type="email" name="email" required autocomplete="email" placeholder="seu@email.com" /></label>
         <label>Senha<input type="password" name="password" required autocomplete="current-password" minlength="6" /></label>
         <p class="auth-form__error" id="login-error" hidden></p>
+        <p class="auth-form__help" id="login-help" hidden>
+          Já é cadastrado? Verifique e-mail e senha.
+          Se ainda não tem conta, <button type="button" class="link-btn" data-go="register">cadastre-se aqui</button>.
+        </p>
         <button type="submit" class="btn btn--primary auth-form__submit">Entrar</button>
-        <p class="auth-form__switch">Não tem conta? <button type="button" class="link-btn" data-switch="register">Cadastre-se</button></p>
       </form>
+    </section>
 
-      <form id="form-register" class="auth-form" data-panel="register" hidden>
+    <!-- Tela 3: somente cadastro -->
+    <section class="auth-screen" id="auth-register-screen" hidden>
+      <button type="button" class="auth-card__back auth-screen__back" data-go="choice">← Voltar</button>
+      <form id="form-register" class="auth-form">
         <h2 class="auth-form__title">Criar conta</h2>
         <p class="auth-form__notice" id="register-notice" hidden></p>
         <label>Nome<input type="text" name="name" required autocomplete="name" placeholder="Seu nome" /></label>
@@ -54,13 +60,13 @@
         <label>Senha<input type="password" name="password" required autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres" /></label>
         <p class="auth-form__error" id="register-error" hidden></p>
         <button type="submit" class="btn btn--primary auth-form__submit">Criar conta</button>
-        <p class="auth-form__switch">Já tem conta? <button type="button" class="link-btn" data-switch="login">Entrar</button></p>
+        <p class="auth-form__switch">Já tem conta? <button type="button" class="link-btn" data-go="login">Entrar</button></p>
       </form>
     </section>
 
     <p class="auth-card__hint auth-card__hint--global">Bolão recreativo, sem apostas ou prêmios.</p>
   </main>
   <div class="toast" id="toast" role="status"></div>
-  <script type="module" src="js/auth-page.js"></script>
+  <script type="module" src="js/auth-page.js?v=2"></script>
 </body>
 </html>
