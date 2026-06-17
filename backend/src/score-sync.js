@@ -8,6 +8,8 @@ import { teamIdFromSportsDb } from './sportsdb-team-map.js';
 import {
   syncMatchGoalsFromEvent,
   shouldResyncMatchGoals,
+  backfillMissingGoals,
+  importMissingResultsFromOpenFootball,
 } from './goal-sync.js';
 import {
   getSeasonEvents,
@@ -238,6 +240,20 @@ export async function runScoreSync() {
   };
 
   try {
+    const ofResults = await importMissingResultsFromOpenFootball();
+    if (ofResults.imported > 0) {
+      updated += ofResults.imported;
+      console.log(`[sync] openfootball: ${ofResults.imported} placar(es) importado(s)`);
+    }
+
+    const backfill = await backfillMissingGoals({
+      maxMatches: Number(process.env.SYNC_GOAL_BACKFILL_MAX || 40),
+    });
+    goalsSynced += backfill.synced;
+    if (backfill.synced > 0) {
+      console.log(`[sync] backfill openfootball: ${backfill.synced}/${backfill.pending} jogo(s) com artilheiros`);
+    }
+
     const { rateLimited, events } = await fetchSeasonEvents();
     if (rateLimited) {
       state.lastError = null;

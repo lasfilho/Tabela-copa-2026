@@ -5,8 +5,9 @@
  * - TheSportsDB (lookuptimeline.php): fallback gratuito, frequentemente incompleta.
  */
 import { query } from './db.js';
+import { recalculatePoolsForMatch } from './pool/pool-ranking.js';
 import { teamIdFromSportsDb } from './sportsdb-team-map.js';
-import { fetchWorldCupJsonGoals } from './worldcup-json.js';
+import { fetchWorldCupJsonGoals, fetchWorldCupJsonMatches } from './worldcup-json.js';
 import { getEventTimeline } from './sportsdb-fetch.js';
 
 function config() {
@@ -388,6 +389,147 @@ export async function fetchTopScorersRows() {
     ORDER BY goals DESC, player
   `);
   return rows;
+}
+
+function formatMatchDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+/**
+ * Importa placares finalizados do openfootball quando ainda não há resultado real no banco.
+ * Cobre atrasos da TheSportsDB (ex.: jogos do dia anterior com artilheiros completos).
+ */
+export async function importMissingResultsFromOpenFootball() {
+  const wcMatches = await fetchWorldCupJsonMatches();
+  let imported = 0;
+
+  for (const wc of wcMatches) {
+    if (!wc.score?.ft || !wc.date) continue;
+
+    const team1Id = teamIdFromSportsDb(wc.team1);
+    const team2Id = teamIdFromSportsDb(wc.team2);
+    if (!team1Id || !team2Id) continue;
+
+    const { rows } = await query(
+      `SELECT m.id, m.home_team, m.away_team FROM matches m
+       WHERE ((m.home_team = $1 AND m.away_team = $2) OR (m.home_team = $2 AND m.away_team = $1))
+         AND m.match_date BETWEEN ($3::date - INTERVAL '1 day') AND ($3::date + INTERVAL '1 day')
+       ORDER BY ABS(m.match_date - $3::date)
+       LIMIT 1`,
+      [team1Id, team2Id, wc.date]
+    );
+    if (!rows.length) continue;
+
+    const matchId = rows[0].id;
+    const dbHome = rows[0].home_team;
+    const { rows: existing } = await query(
+      `SELECT home_score, status FROM match_results
+       WHERE match_id = $1 AND mode = 'real'`,
+      [matchId]
+    );
+    if (existing.length && existing[0].status === 'finished' && existing[0].home_score != null) {
+      continue;
+    }
+
+    const [s1, s2] = wc.score.ft;
+    const homeScore = dbHome === team1Id ? s1 : s2;
+    const awayScore = dbHome === team1Id ? s2 : s1;
+
+    await query(
+      `INSERT INTO match_results (match_id, mode, home_score, away_score, status, updated_at)
+       VALUES ($1, 'real', $2, $3, 'finished', NOW())
+       ON CONFLICT (match_id, mode) DO UPDATE SET
+         home_score = EXCLUDED.home_score,
+         away_score = EXCLUDED.away_score,
+         status = EXCLUDED.status,
+         updated_at = NOW()`,
+      [matchId, homeScore, awayScore]
+    );
+    imported += 1;
+    console.log(`[openfootball] ${matchId}: ${homeScore}×${awayScore} [finished]`);
+    recalculatePoolsForMatch(matchId).catch((err) => console.error('Pool ranking recalc:', err.message));
+  }
+
+  return { imported };
+}
+
+/** Jogos finalizados com placar mas artilheiros incompletos (prioriza os mais recentes). */
+export async function listMatchesNeedingGoals(limit = 50) {
+  const { rows } = await query(`
+    SELECT
+      m.id,
+      m.home_team,
+      m.away_team,
+      m.match_date,
+      r.home_score,
+      r.away_score,
+      (
+        SELECT COUNT(*)::int FROM match_goals g
+        WHERE g.match_id = m.id
+          AND g.player IS NOT NULL
+          AND g.counts_for_scorer = true
+          AND g.is_own_goal = false
+      ) AS named_goals
+    FROM matches m
+    JOIN match_results r ON r.match_id = m.id AND r.mode = 'real'
+    WHERE r.status = 'finished'
+      AND r.home_score IS NOT NULL
+      AND r.away_score IS NOT NULL
+      AND (COALESCE(r.home_score, 0) + COALESCE(r.away_score, 0)) > 0
+    ORDER BY m.match_date DESC, m.id
+  `);
+
+  return rows
+    .filter((row) => {
+      const total = Number(row.home_score) + Number(row.away_score);
+      return Number(row.named_goals) < total;
+    })
+    .slice(0, limit);
+}
+
+/**
+ * Importa gols via openfootball (grátis, sem rate limit TheSportsDB).
+ * Usado em backfill para não depender do orçamento de timeline.
+ */
+export async function backfillMissingGoals({ maxMatches = 40 } = {}) {
+  const pending = await listMatchesNeedingGoals(maxMatches);
+  let synced = 0;
+
+  for (const m of pending) {
+    try {
+      const before = Number(m.named_goals);
+      const result = await syncMatchGoalsFromEvent(
+        m.id,
+        null,
+        m.home_team,
+        m.away_team,
+        m.home_score,
+        m.away_score,
+        null,
+        formatMatchDate(m.match_date)
+      );
+      if (!result.ok) continue;
+
+      const total = Number(m.home_score) + Number(m.away_score);
+      const improved = result.detailedGoals > before;
+      if (improved && result.detailedGoals > 0) {
+        synced += 1;
+        console.log(
+          `[goals] backfill ${m.id}: ${result.detailedGoals}/${total} artilheiro(s) [${result.source}]`
+        );
+      }
+    } catch (err) {
+      console.warn(`[goals] backfill ${m.id}:`, err.message);
+    }
+  }
+
+  if (synced > 0) {
+    await recalculateTopScorersFromGoals();
+  }
+
+  return { pending: pending.length, synced };
 }
 
 export async function hasSyncedGoals() {

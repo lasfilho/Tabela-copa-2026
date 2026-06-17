@@ -4,7 +4,7 @@ import { TOURNAMENT } from '../seed.js';
 import { resolveMatchStatus, finalizeStaleLiveResults } from '../match-status.js';
 import { getSyncStatus, setSyncEnabled, runScoreSync } from '../score-sync.js';
 import { getSportsApiStatus } from '../sportsdb-fetch.js';
-import { fetchTopScorersRows } from '../goal-sync.js';
+import { fetchTopScorersRows, backfillMissingGoals, importMissingResultsFromOpenFootball } from '../goal-sync.js';
 import { authMiddleware, canWriteScores, requireAdmin } from '../auth.js';
 import { recalculatePoolsForMatch } from '../pool/pool-ranking.js';
 
@@ -46,6 +46,12 @@ router.get('/bootstrap', async (req, res, next) => {
       for (const id of matchIds) {
         recalculatePoolsForMatch(id).catch((err) => console.error('Pool ranking recalc:', err.message));
       }
+      await importMissingResultsFromOpenFootball().catch((err) => {
+        console.warn('[bootstrap] openfootball placares:', err.message);
+      });
+      await backfillMissingGoals({
+        maxMatches: Number(process.env.SYNC_GOAL_BACKFILL_MAX || 40),
+      }).catch((err) => console.warn('[bootstrap] backfill gols:', err.message));
     }
 
     const [teamsRes, groupsRes, matchesRes, scorersRes, matchGoalsRes, squadRes, prefsRes] = await Promise.all([
@@ -334,6 +340,18 @@ router.post('/sync/run', requireAdmin, async (_req, res, next) => {
   try {
     const result = await runScoreSync();
     res.json({ ...result, ...(await getSyncStatus()) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/sync/goals — backfill de artilheiros (openfootball) */
+router.post('/sync/goals', requireAdmin, async (_req, res, next) => {
+  try {
+    const result = await backfillMissingGoals({
+      maxMatches: Number(process.env.SYNC_GOAL_BACKFILL_MAX || 40),
+    });
+    res.json({ ok: true, ...result, topScorers: await fetchTopScorersRows() });
   } catch (err) {
     next(err);
   }
