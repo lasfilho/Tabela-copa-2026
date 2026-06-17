@@ -1,4 +1,4 @@
-import { login, register, getToken } from './auth-client.js';
+import { login, register, getToken, clearAuth } from './auth-client.js';
 import { takePendingJoinToken } from './pool-client.js';
 
 const params = new URLSearchParams(location.search);
@@ -9,28 +9,40 @@ if (getToken()) {
   window.location.href = redirect || (pending ? `/boloes?join=${encodeURIComponent(pending)}&auto=1` : '/');
 }
 
+const choiceView = document.getElementById('auth-choice');
+const formsView = document.getElementById('auth-forms');
+
 function showError(id, msg) {
   const el = document.getElementById(id);
   el.textContent = msg;
   el.hidden = !msg;
 }
 
-const choiceView = document.getElementById('auth-choice');
-const formsView = document.getElementById('auth-forms');
+function showNotice(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = !msg;
+}
 
-function selectMode(mode) {
-  document.querySelectorAll('.auth-tab').forEach((t) => {
-    t.classList.toggle('active', t.dataset.tab === mode);
-  });
+function clearMessages() {
+  showError('login-error', '');
+  showError('register-error', '');
+  showNotice('login-notice', '');
+  showNotice('register-notice', '');
+}
+
+/** Mostra apenas o formulário do modo escolhido (login ou register). */
+function selectMode(mode, { keepMessages = false } = {}) {
+  if (!keepMessages) clearMessages();
   document.querySelectorAll('.auth-form').forEach((f) => {
     const active = f.dataset.panel === mode;
     f.classList.toggle('active', active);
     f.hidden = !active;
   });
-  showError('login-error', '');
-  showError('register-error', '');
-  const firstInput = document.querySelector(`.auth-form[data-panel="${mode}"] input`);
-  firstInput?.focus();
+  const firstEmpty = [...document.querySelectorAll(`.auth-form[data-panel="${mode}"] input`)]
+    .find((inp) => !inp.value);
+  (firstEmpty ?? document.querySelector(`.auth-form[data-panel="${mode}"] input`))?.focus();
 }
 
 function showForms(mode) {
@@ -40,6 +52,7 @@ function showForms(mode) {
 }
 
 function showChoice() {
+  clearMessages();
   formsView.hidden = true;
   choiceView.hidden = false;
 }
@@ -50,31 +63,46 @@ document.querySelectorAll('[data-choice]').forEach((btn) => {
 
 document.getElementById('auth-back')?.addEventListener('click', showChoice);
 
-document.querySelectorAll('.auth-tab').forEach((tab) => {
-  tab.addEventListener('click', () => selectMode(tab.dataset.tab));
+document.querySelectorAll('[data-switch]').forEach((btn) => {
+  btn.addEventListener('click', () => selectMode(btn.dataset.switch));
 });
 
 document.getElementById('form-login').addEventListener('submit', async (e) => {
   e.preventDefault();
-  showError('login-error', '');
+  clearMessages();
   const fd = new FormData(e.target);
+  const email = fd.get('email');
   try {
-    await login(fd.get('email'), fd.get('password'));
+    await login(email, fd.get('password'));
     const pending = takePendingJoinToken();
     window.location.href = redirect || (pending ? `/boloes?join=${encodeURIComponent(pending)}&auto=1` : '/');
   } catch (err) {
+    // E-mail não cadastrado: leva para o cadastro com aviso.
+    if (err.status === 404 || err.data?.notRegistered) {
+      const regEmail = document.querySelector('#form-register input[name="email"]');
+      if (regEmail) regEmail.value = email ?? '';
+      selectMode('register', { keepMessages: true });
+      showNotice('register-notice', 'E-mail não cadastrado. Crie sua conta para continuar.');
+      return;
+    }
     showError('login-error', err.message);
   }
 });
 
 document.getElementById('form-register').addEventListener('submit', async (e) => {
   e.preventDefault();
-  showError('register-error', '');
+  clearMessages();
   const fd = new FormData(e.target);
+  const email = fd.get('email');
   try {
-    await register(fd.get('name'), fd.get('email'), fd.get('password'));
-    const pending = takePendingJoinToken();
-    window.location.href = redirect || (pending ? `/boloes?join=${encodeURIComponent(pending)}&auto=1` : '/');
+    await register(fd.get('name'), email, fd.get('password'));
+    // Não faz login automático: envia para a tela de login.
+    clearAuth();
+    e.target.reset();
+    const loginEmail = document.querySelector('#form-login input[name="email"]');
+    if (loginEmail) loginEmail.value = email ?? '';
+    selectMode('login', { keepMessages: true });
+    showNotice('login-notice', 'Cadastro realizado! Faça login para entrar.');
   } catch (err) {
     showError('register-error', err.message);
   }

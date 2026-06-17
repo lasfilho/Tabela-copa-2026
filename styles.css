@@ -2802,10 +2802,32 @@ body[data-active-mode="simulation"] #sim-clear-btn:not([hidden]):hover {
   font: inherit;
 }
 
+.auth-form__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.3rem;
+}
+
 .auth-form__error {
   color: var(--danger);
   font-size: 0.85rem;
   margin: 0;
+}
+
+.auth-form__notice {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--accent);
+  background: rgba(61, 255, 170, 0.1);
+  border: 1px solid rgba(61, 255, 170, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.75rem;
+}
+
+.auth-form__switch {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 .auth-form__submit { width: 100%; margin-top: 0.25rem; }

@@ -36,7 +36,10 @@ router.post('/login', async (req, res, next) => {
     }
 
     const user = await findUserByEmail(email);
-    if (!user || !(await verifyPassword(password, user.password_hash))) {
+    if (!user) {
+      return res.status(404).json({ error: 'E-mail não cadastrado', notRegistered: true });
+    }
+    if (!(await verifyPassword(password, user.password_hash))) {
       return res.status(401).json({ error: 'E-mail ou senha incorretos' });
     }
 
