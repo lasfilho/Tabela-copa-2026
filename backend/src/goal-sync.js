@@ -495,6 +495,24 @@ export async function importMissingResultsFromOpenFootball() {
   return { imported };
 }
 
+/** Remove gols de correções manuais antigas (ex.: artilharia forçada) para reimportar da fonte oficial. */
+export async function purgeLegacyCorrectedGoals() {
+  const { rows } = await query(
+    `SELECT DISTINCT match_id FROM match_goals WHERE source = 'corrected'`
+  );
+  if (!rows.length) return { purged: [] };
+
+  for (const { match_id } of rows) {
+    await query(`DELETE FROM match_goals WHERE match_id = $1`, [match_id]);
+    console.log(`[goals] removidos gols legados (correção manual) — ${match_id} será reimportado`);
+  }
+
+  if (rows.length) {
+    await recalculateTopScorersFromGoals();
+  }
+  return { purged: rows.map((r) => r.match_id) };
+}
+
 /** Jogos finalizados com placar mas artilheiros incompletos (prioriza os mais recentes). */
 export async function listMatchesNeedingGoals(limit = 50) {
   const { rows } = await query(`

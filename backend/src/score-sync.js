@@ -10,6 +10,7 @@ import {
   shouldResyncMatchGoals,
   backfillMissingGoals,
   importMissingResultsFromOpenFootball,
+  purgeLegacyCorrectedGoals,
 } from './goal-sync.js';
 import {
   getSeasonEvents,
@@ -244,6 +245,11 @@ export async function runScoreSync() {
     if (ofResults.imported > 0) {
       updated += ofResults.imported;
       console.log(`[sync] openfootball: ${ofResults.imported} placar(es) importado(s)`);
+    }
+
+    const purged = await purgeLegacyCorrectedGoals();
+    if (purged.purged.length) {
+      console.log(`[sync] limpeza: ${purged.purged.length} jogo(s) com correção manual legada`);
     }
 
     const backfill = await backfillMissingGoals({

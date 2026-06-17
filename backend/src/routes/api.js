@@ -4,7 +4,7 @@ import { TOURNAMENT } from '../seed.js';
 import { resolveMatchStatus, finalizeStaleLiveResults } from '../match-status.js';
 import { getSyncStatus, setSyncEnabled, runScoreSync } from '../score-sync.js';
 import { getSportsApiStatus } from '../sportsdb-fetch.js';
-import { fetchTopScorersRows, backfillMissingGoals, importMissingResultsFromOpenFootball } from '../goal-sync.js';
+import { fetchTopScorersRows, backfillMissingGoals, importMissingResultsFromOpenFootball, purgeLegacyCorrectedGoals } from '../goal-sync.js';
 import { authMiddleware, canWriteScores, requireAdmin } from '../auth.js';
 import { recalculatePoolsForMatch } from '../pool/pool-ranking.js';
 
@@ -48,6 +48,9 @@ router.get('/bootstrap', async (req, res, next) => {
       }
       await importMissingResultsFromOpenFootball().catch((err) => {
         console.warn('[bootstrap] openfootball placares:', err.message);
+      });
+      await purgeLegacyCorrectedGoals().catch((err) => {
+        console.warn('[bootstrap] limpeza gols corrigidos:', err.message);
       });
       await backfillMissingGoals({
         maxMatches: Number(process.env.SYNC_GOAL_BACKFILL_MAX || 40),
