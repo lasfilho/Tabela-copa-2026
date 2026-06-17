@@ -8,7 +8,7 @@ import { query } from './db.js';
 import { recalculatePoolsForMatch } from './pool/pool-ranking.js';
 import { teamIdFromSportsDb } from './sportsdb-team-map.js';
 import { fetchWorldCupJsonGoals, fetchWorldCupJsonMatches } from './worldcup-json.js';
-import { getEventTimeline } from './sportsdb-fetch.js';
+import { applyGoalCorrections } from './goal-corrections.js';
 
 function config() {
   return {
@@ -143,6 +143,36 @@ function scoreGoalCandidate(goals, homeId, awayId, homeScore, awayScore) {
   return score;
 }
 
+function mergeGoalSources(candidates, homeId, awayId, homeScore, awayScore) {
+  const withGoals = candidates.filter((c) => c.goals.length);
+  if (!withGoals.length) return { goals: [], source: 'none' };
+
+  const byKey = new Map();
+  for (const c of withGoals) {
+    for (const g of c.goals) {
+      const key = `${g.minute ?? 'x'}|${g.player ?? ''}|${g.isOwnGoal ? 'og' : 'g'}`;
+      const existing = byKey.get(key);
+      if (!existing || (!existing.player && g.player)) {
+        byKey.set(key, { ...g, source: g.source || c.source });
+      }
+    }
+  }
+
+  let merged = [...byKey.values()];
+  merged.sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999));
+
+  const named = merged.filter((g) => g.player && g.countsForScorer && !g.isOwnGoal).length;
+  const bestSingle = pickBestGoalSource(candidates, homeId, awayId, homeScore, awayScore);
+  const bestNamed = bestSingle.goals.filter((g) => g.player && g.countsForScorer && !g.isOwnGoal).length;
+
+  if (bestNamed > named) {
+    return bestSingle;
+  }
+
+  const sources = [...new Set(withGoals.map((c) => c.source))].join('+');
+  return { goals: merged, source: sources || 'merged' };
+}
+
 function pickBestGoalSource(candidates, homeId, awayId, homeScore, awayScore) {
   const withGoals = candidates.filter((c) => c.goals.length);
   if (!withGoals.length) return { goals: [], source: 'none' };
@@ -208,6 +238,16 @@ export async function countScoringGoalsForMatch(matchId, homeId, awayId, homeSco
   return totals.home === homeScore && totals.away === awayScore;
 }
 
+export async function countNamedScoringGoalsForMatch(matchId) {
+  const { rows } = await query(
+    `SELECT COUNT(*)::int AS n FROM match_goals
+     WHERE match_id = $1 AND player IS NOT NULL
+       AND counts_for_scorer = true AND is_own_goal = false`,
+    [matchId]
+  );
+  return rows[0].n;
+}
+
 export async function countNamedGoalsForMatch(matchId) {
   const { rows } = await query(
     `SELECT COUNT(*)::int AS n FROM match_goals
@@ -228,7 +268,7 @@ export async function shouldResyncMatchGoals(matchId, homeId, awayId, homeScore,
   const scoreComplete = await countScoringGoalsForMatch(matchId, homeId, awayId, homeScore, awayScore);
   if (!scoreComplete) return true;
 
-  const namedGoals = await countNamedGoalsForMatch(matchId);
+  const namedGoals = await countNamedScoringGoalsForMatch(matchId);
   return namedGoals < totalGoals;
 }
 
@@ -263,7 +303,7 @@ export async function syncMatchGoalsFromEvent(
     homeId, awayId, matchDate, homeScore, awayScore
   );
 
-  const picked = pickBestGoalSource(
+  const picked = mergeGoalSources(
     [
       { goals: openFootballGoals, source: 'openfootball' },
       { goals: apiFootballGoals, source: 'api-football' },
@@ -275,7 +315,7 @@ export async function syncMatchGoalsFromEvent(
     awayScore
   );
 
-  let goals = picked.goals;
+  let goals = applyGoalCorrections(matchId, picked.goals, homeId, awayId);
   const sourceUsed = picked.source;
   goals = reconcileGoalsWithScore(goals, matchId, homeId, awayId, homeScore, awayScore);
 
@@ -493,12 +533,15 @@ export async function listMatchesNeedingGoals(limit = 50) {
  * Importa gols via openfootball (grátis, sem rate limit TheSportsDB).
  * Usado em backfill para não depender do orçamento de timeline.
  */
-export async function backfillMissingGoals({ maxMatches = 40 } = {}) {
+export async function backfillMissingGoals({ maxMatches = 40, force = false } = {}) {
   const pending = await listMatchesNeedingGoals(maxMatches);
   let synced = 0;
 
   for (const m of pending) {
     try {
+      const total = Number(m.home_score) + Number(m.away_score);
+      if (!force && Number(m.named_goals) >= total) continue;
+
       const before = Number(m.named_goals);
       const result = await syncMatchGoalsFromEvent(
         m.id,
@@ -512,7 +555,6 @@ export async function backfillMissingGoals({ maxMatches = 40 } = {}) {
       );
       if (!result.ok) continue;
 
-      const total = Number(m.home_score) + Number(m.away_score);
       const improved = result.detailedGoals > before;
       if (improved && result.detailedGoals > 0) {
         synced += 1;
