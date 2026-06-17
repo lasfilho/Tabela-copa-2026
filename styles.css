@@ -3343,6 +3343,19 @@ body.read-only .score-editor button {
   .settings-section--wide { grid-column: auto; }
 }
 
+/* Ação de encerrar/reabrir jogo (admin, modo real) */
+.match-list-card__status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+.match-status-btn {
+  white-space: nowrap;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+}
+
 /* ============ Álbum de Figurinhas ============ */
 .stk-wrap { display: flex; flex-direction: column; gap: 1.25rem; }
 

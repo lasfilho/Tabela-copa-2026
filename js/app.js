@@ -7,7 +7,7 @@ import { renderCharts } from './charts.js';
 import { resolveKnockoutBracket } from './knockout-resolver.js';
 import { applyStatuses } from './match-status.js';
 import {
-  saveMatchScore, savePreferences, clearAllScores,
+  saveMatchScore, setMatchStatus, savePreferences, clearAllScores,
   fetchSyncStatus, toggleScoreSync, runScoreSyncNow,
 } from './api-client.js';
 import { fetchCurrentUser, getStoredUser, getToken, logout } from './auth-client.js';
@@ -17,7 +17,7 @@ import {
   renderGroupsFilters, renderMatchesFilters, renderMatchesTable, renderKnockout,
   renderTeams, renderCompare, renderTeamDetail, renderCalendar,
   renderPerformanceRanking, renderTopScorersRanking, setFavToggleHandler, bindOverviewFavs,
-  updatePhaseBadge, setScoreSaveHandler, bindScoreEditors, updateModeUI,
+  updatePhaseBadge, setScoreSaveHandler, bindScoreEditors, bindMatchActions, updateModeUI,
   openScoreModal, setPermissions,
 } from './views.js';
 import { renderTeamDetailCharts, destroyTeamCharts } from './team-charts.js';
@@ -376,7 +376,30 @@ async function persistMatchScore(matchId, homeRaw, awayRaw, options = {}) {
     await saveMatchScore(state.mode, matchId, homeRaw, awayRaw);
     await reloadData();
     renderAll();
-    if (!quiet) showToast('Placar salvo — jogo marcado como encerrado');
+    if (!quiet) {
+      showToast(state.mode === 'simulation'
+        ? 'Placar salvo'
+        : 'Placar atualizado — use "Encerrar" para finalizar o jogo');
+    }
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function setMatchFinished(matchId, finished) {
+  if (!state.permissions.canEditScores) {
+    showToast('Somente leitura neste modo');
+    return;
+  }
+  if (state.offline) {
+    showToast('API offline — inicie o Docker');
+    return;
+  }
+  try {
+    await setMatchStatus(state.mode, matchId, finished ? 'finished' : 'live');
+    await reloadData();
+    renderAll();
+    showToast(finished ? 'Jogo encerrado' : 'Jogo reaberto — em andamento');
   } catch (err) {
     showToast(err.message);
   }
@@ -776,6 +799,10 @@ function renderAll() {
       renderMatchesTable(data, state);
       bindScoreEditors(document.getElementById('matches-table-wrap'), persistMatchScore, {
         autoSave: state.mode === 'simulation',
+      });
+      bindMatchActions(document.getElementById('matches-table-wrap'), {
+        onFinish: (id) => setMatchFinished(id, true),
+        onReopen: (id) => setMatchFinished(id, false),
       });
       break;
     case 'knockout':

@@ -145,20 +145,37 @@ router.put('/matches/:id/score', async (req, res, next) => {
     const phase = matchRes.rows[0].phase;
     const home = homeScore === '' || homeScore == null ? null : Number(homeScore);
     const away = awayScore === '' || awayScore == null ? null : Number(awayScore);
+    const finishRequested = req.body.finish === true || req.body.status === 'finished';
+    let resultStatus = null;
 
     if (home != null && away != null) {
       if (phase !== 'group' && home === away) {
         return res.status(400).json({ error: 'No mata-mata é necessário um vencedor (placares diferentes)' });
       }
+
+      if (mode === 'simulation') {
+        resultStatus = 'finished';
+      } else {
+        // Atualização manual em modo real NÃO encerra o jogo. Mantém "live"
+        // (preservando "finished" se já estava encerrado) e só encerra quando
+        // o admin pede explicitamente (finish/status=finished).
+        const existing = await query(
+          `SELECT status FROM match_results WHERE match_id = $1 AND mode = $2`,
+          [id, mode]
+        );
+        const existingStatus = existing.rows[0]?.status;
+        resultStatus = finishRequested || existingStatus === 'finished' ? 'finished' : 'live';
+      }
+
       await query(
         `INSERT INTO match_results (match_id, mode, home_score, away_score, status, updated_at)
-         VALUES ($1,$2,$3,$4,'finished',NOW())
+         VALUES ($1,$2,$3,$4,$5,NOW())
          ON CONFLICT (match_id, mode) DO UPDATE SET
            home_score = EXCLUDED.home_score,
            away_score = EXCLUDED.away_score,
-           status = 'finished',
+           status = EXCLUDED.status,
            updated_at = NOW()`,
-        [id, mode, home, away]
+        [id, mode, home, away, resultStatus]
       );
     } else {
       await query(`DELETE FROM match_results WHERE match_id = $1 AND mode = $2`, [id, mode]);
@@ -173,7 +190,62 @@ router.put('/matches/:id/score', async (req, res, next) => {
 
     res.json(mapMatchRow(rows[0], mode));
 
-    if (mode === 'real' && home != null && away != null) {
+    if (mode === 'real' && resultStatus === 'finished') {
+      recalculatePoolsForMatch(id).catch((err) => console.error('Pool ranking recalc:', err.message));
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** PUT /api/matches/:id/status — encerrar/reabrir manualmente (admin, modo real) */
+router.put('/matches/:id/status', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const mode = req.body.mode === 'simulation' ? 'simulation' : 'real';
+
+    if (!canWriteScores(req.user, mode)) {
+      return res.status(403).json({
+        error: mode === 'real'
+          ? 'Modo Real é somente leitura. Apenas administradores podem editar.'
+          : 'Faça login para editar placares na simulação.',
+      });
+    }
+
+    const status = req.body.status === 'finished' ? 'finished' : 'live';
+
+    const matchRes = await query(`SELECT id FROM matches WHERE id = $1`, [id]);
+    if (!matchRes.rows.length) return res.status(404).json({ error: 'Jogo não encontrado' });
+
+    const existing = await query(
+      `SELECT home_score, away_score FROM match_results WHERE match_id = $1 AND mode = $2`,
+      [id, mode]
+    );
+    const row0 = existing.rows[0];
+
+    if (status === 'finished' && (!row0 || row0.home_score == null || row0.away_score == null)) {
+      return res.status(400).json({ error: 'Defina o placar antes de encerrar a partida' });
+    }
+    if (status === 'live' && !row0) {
+      return res.status(400).json({ error: 'Não há placar registrado para reabrir' });
+    }
+
+    await query(
+      `UPDATE match_results SET status = $3, updated_at = NOW()
+       WHERE match_id = $1 AND mode = $2`,
+      [id, mode, status]
+    );
+
+    const { rows } = await query(`
+      SELECT m.*, r.home_score, r.away_score, COALESCE(r.status, 'scheduled') AS status
+      FROM matches m
+      LEFT JOIN match_results r ON r.match_id = m.id AND r.mode = $2
+      WHERE m.id = $1
+    `, [id, mode]);
+
+    res.json(mapMatchRow(rows[0], mode));
+
+    if (mode === 'real') {
       recalculatePoolsForMatch(id).catch((err) => console.error('Pool ranking recalc:', err.message));
     }
   } catch (err) {

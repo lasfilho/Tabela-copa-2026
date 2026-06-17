@@ -43,10 +43,19 @@ export async function fetchBootstrap(mode = 'real') {
   };
 }
 
-export async function saveMatchScore(mode, matchId, homeScore, awayScore) {
+export async function saveMatchScore(mode, matchId, homeScore, awayScore, options = {}) {
+  const body = { mode, homeScore, awayScore };
+  if (options.finish) body.finish = true;
   return request(`/matches/${matchId}/score`, {
     method: 'PUT',
-    body: JSON.stringify({ mode, homeScore, awayScore }),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function setMatchStatus(mode, matchId, status) {
+  return request(`/matches/${matchId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ mode, status }),
   });
 }
 

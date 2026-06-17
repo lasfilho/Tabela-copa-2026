@@ -497,9 +497,27 @@ function matchListCardHTML(data, state, m) {
         </div>
         <div class="match-list-card__status">
           <span class="status-pill status-pill--${m.status}">${statusLabel(m.status)}</span>
+          ${matchStatusActionHTML(m)}
         </div>
       </div>
     </article>`;
+}
+
+function matchStatusActionHTML(m) {
+  if (!perms.canEditScores || perms.mode !== 'real') return '';
+  return m.status === 'finished'
+    ? `<button type="button" class="btn btn--ghost btn--sm match-status-btn" data-reopen-match="${m.id}" title="Reabrir como em andamento">Reabrir</button>`
+    : `<button type="button" class="btn btn--ghost btn--sm match-status-btn" data-finish-match="${m.id}" title="Encerrar partida manualmente">Encerrar</button>`;
+}
+
+export function bindMatchActions(root, { onFinish, onReopen } = {}) {
+  if (!root) return;
+  root.querySelectorAll('[data-finish-match]').forEach((btn) => {
+    btn.addEventListener('click', () => onFinish?.(btn.dataset.finishMatch));
+  });
+  root.querySelectorAll('[data-reopen-match]').forEach((btn) => {
+    btn.addEventListener('click', () => onReopen?.(btn.dataset.reopenMatch));
+  });
 }
 
 export function renderMatchesTable(data, state) {
