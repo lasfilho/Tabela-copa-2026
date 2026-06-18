@@ -5,7 +5,7 @@
 
 export const DEFAULT_SCORE_RULES = {
   version: 2,
-  exactScore: 8,
+  exactScore: 10,
   correctResult: 5,
   correctWinnerGoals: 2,
   correctLoserGoals: 2,

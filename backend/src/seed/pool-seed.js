@@ -119,4 +119,6 @@ export async function runPoolMigrations() {
      WHERE is_default = true OR name = 'Padrão Copa 2026'`,
     [JSON.stringify(DEFAULT_SCORE_RULES), 'Pontuação recreativa padrão (v2)']
   );
+
+  await recalculateAllPools();
 }
