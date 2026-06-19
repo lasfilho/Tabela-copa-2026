@@ -42,7 +42,7 @@ export const GROUP_MATCHES = [
   m('GD-1', 'group', 'D', 1, '2026-06-12', '22:00', 'SoFi Stadium, Los Angeles', 'USA', 'PAR'),
   m('GD-2', 'group', 'D', 1, '2026-06-14', '01:00', 'BC Place, Vancouver', 'AUS', 'TUR'),
   m('GD-3', 'group', 'D', 2, '2026-06-19', '16:00', 'Lumen Field, Seattle', 'USA', 'AUS'),
-  m('GD-4', 'group', 'D', 2, '2026-06-19', '01:00', 'Levi\'s Stadium, San Francisco', 'TUR', 'PAR'),
+  m('GD-4', 'group', 'D', 2, '2026-06-20', '00:00', 'Levi\'s Stadium, San Francisco', 'TUR', 'PAR'),
   m('GD-5', 'group', 'D', 3, '2026-06-25', '22:00', 'SoFi Stadium, Los Angeles', 'PAR', 'AUS'),
   m('GD-6', 'group', 'D', 3, '2026-06-25', '22:00', 'Levi\'s Stadium, San Francisco', 'TUR', 'USA'),
   // Grupo E

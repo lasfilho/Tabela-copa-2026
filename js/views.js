@@ -7,7 +7,7 @@ import {
   getWinner, thirdPlaceRanking, filterMatches, teamStats, teamDetailedStats,
   teamGoalContributions,
   teamScorers, normalizeScorers,
-  formatDate, formatDateShort, isToday, statusLabel, phaseLabel,
+  formatDate, formatDateShort, formatMatchTime, isToday, statusLabel, phaseLabel,
 } from './engine.js';
 import { groupProgress } from './knockout-resolver.js';
 import { matchKickoff } from './match-status.js';
@@ -156,7 +156,7 @@ export function openScoreModal(data, matchId, handler) {
     `${teamName(data, m.home)} × ${teamName(data, m.away)}`;
   document.getElementById('score-modal-body').innerHTML = `
     <p style="color:var(--text-muted);font-size:0.85rem;margin-top:0">
-      ${formatDate(m.date)} · ${m.time} · ${m.venue || phaseLabel(m.phase)}
+      ${formatDate(m.date)} · ${formatMatchTime(m.time)} · ${m.venue || phaseLabel(m.phase)}
     </p>
     <div style="margin:1rem 0;text-align:center">${scoreEditorHTML(m)}</div>
     <p style="font-size:0.78rem;color:var(--text-muted)">${perms.mode === 'simulation' ? 'Placar salvo automaticamente ao editar' : 'Enter para salvar · Limpar remove o resultado'}</p>`;
@@ -248,7 +248,7 @@ function matchRowHTML(data, m, state, compact = false, editable = false) {
         ${m.away ? `<img class="flag" src="${flagUrl(data.teamMap[m.away])}" alt="" />` : ''}
         <span>${teamName(data, m.away)}</span>
       </div>
-      ${compact ? '' : `<div class="match-row__meta">${formatDate(m.date)} · ${m.time} BRT · ${m.venue || phaseLabel(m.phase)}${perms.canEditScores && !editable ? ` · <button type="button" class="expand-btn" data-edit-match="${m.id}">Editar placar</button>` : ''}</div>`}
+      ${compact ? '' : `<div class="match-row__meta">${formatDate(m.date)} · ${formatMatchTime(m.time)} BRT · ${m.venue || phaseLabel(m.phase)}${perms.canEditScores && !editable ? ` · <button type="button" class="expand-btn" data-edit-match="${m.id}">Editar placar</button>` : ''}</div>`}
     </div>`;
 }
 
@@ -336,7 +336,7 @@ function renderStandingsTable(data, groupId, standings, state, qualifiedThirds, 
             ${labelTeam(m.away)}
           </div>
           <span class="status-pill status-pill--${m.status}">${statusLabel(m.status)}</span>
-          <div class="group-match-item__meta">Rodada ${m.matchday} · ${formatDate(m.date)} · ${m.time} BRT</div>
+          <div class="group-match-item__meta">Rodada ${m.matchday} · ${formatDate(m.date)} · ${formatMatchTime(m.time)} BRT</div>
         </div>`).join('')}
     </div>` : '';
 
@@ -467,7 +467,7 @@ function matchMetaLineHTML(m) {
     phaseLabel(m.phase),
     m.group ? `Grupo ${m.group}` : null,
     formatDate(m.date),
-    `${m.time} BRT`,
+    `${formatMatchTime(m.time)} BRT`,
     m.venue || null,
   ].filter(Boolean);
 

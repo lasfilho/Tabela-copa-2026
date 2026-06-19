@@ -360,6 +360,12 @@ export function formatDateShort(dateStr) {
   });
 }
 
+/** Meia-noite BRT exibida como 24:00 (padrão de grade esportiva brasileira). */
+export function formatMatchTime(time) {
+  const t = String(time ?? '').slice(0, 5);
+  return t === '00:00' ? '24:00' : t;
+}
+
 export function isToday(dateStr) {
   return dateStr === todayDateString();
 }

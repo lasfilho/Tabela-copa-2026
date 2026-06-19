@@ -18,6 +18,16 @@ export async function runMigrations() {
   await query(schema);
 }
 
+/** Corrige calendário oficial já gravado (idempotente). */
+export async function applyScheduleCorrections() {
+  await query(
+    `UPDATE matches SET
+       match_date = $2, match_time = $3, venue = $4, home_team = $5, away_team = $6
+     WHERE id = $1`,
+    ['GD-4', '2026-06-20', '00:00', "Levi's Stadium, San Francisco", 'TUR', 'PAR']
+  );
+}
+
 export async function seedDatabase() {
   const { rows } = await query('SELECT COUNT(*)::int AS n FROM teams');
   if (rows[0].n > 0) {
@@ -121,6 +131,7 @@ export async function initDatabase() {
     }
   }
   await runMigrations();
+  await applyScheduleCorrections();
   await runPoolMigrations();
   await runStickerMigrations();
   await seedDatabase();
