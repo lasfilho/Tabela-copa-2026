@@ -20,4 +20,7 @@ export const FIFA_FIXTURES = {
   // Grupo L — rodada 3 trocada
   'GL-5': ['CRO', 'GHA'],
   'GL-6': ['PAN', 'ENG'],
+  // Grupo H — rodada 3 (26/06)
+  'GH-5': ['CPV', 'KSA'],
+  'GH-6': ['URU', 'ESP'],
 };

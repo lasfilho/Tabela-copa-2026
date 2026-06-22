@@ -24,7 +24,7 @@ const OFFICIAL_GROUP = {
   'GG-1': ['BEL', 'EGY'], 'GG-2': ['IRN', 'NZL'], 'GG-3': ['BEL', 'IRN'], 'GG-4': ['NZL', 'EGY'],
   'GG-5': ['NZL', 'BEL'], 'GG-6': ['EGY', 'IRN'],
   'GH-1': ['ESP', 'CPV'], 'GH-2': ['KSA', 'URU'], 'GH-3': ['ESP', 'KSA'], 'GH-4': ['URU', 'CPV'],
-  'GH-5': ['CPV', 'ESP'], 'GH-6': ['URU', 'KSA'],
+  'GH-5': ['CPV', 'KSA'], 'GH-6': ['URU', 'ESP'],
   'GI-1': ['FRA', 'SEN'], 'GI-2': ['IRQ', 'NOR'], 'GI-3': ['FRA', 'IRQ'], 'GI-4': ['NOR', 'SEN'],
   'GI-5': ['SEN', 'IRQ'], 'GI-6': ['NOR', 'FRA'],
   'GJ-1': ['ARG', 'ALG'], 'GJ-2': ['AUT', 'JOR'], 'GJ-3': ['ARG', 'AUT'], 'GJ-4': ['JOR', 'ALG'],

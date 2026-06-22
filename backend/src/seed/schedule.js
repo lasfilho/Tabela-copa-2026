@@ -72,8 +72,8 @@ export const GROUP_MATCHES = [
   m('GH-2', 'group', 'H', 1, '2026-06-15', '19:00', 'Hard Rock Stadium, Miami', 'KSA', 'URU'),
   m('GH-3', 'group', 'H', 2, '2026-06-21', '13:00', 'Mercedes-Benz Stadium, Atlanta', 'ESP', 'KSA'),
   m('GH-4', 'group', 'H', 2, '2026-06-21', '19:00', 'NRG Stadium, Houston', 'URU', 'CPV'),
-  m('GH-5', 'group', 'H', 3, '2026-06-26', '21:00', 'Gillette Stadium, Boston', 'CPV', 'ESP'),
-  m('GH-6', 'group', 'H', 3, '2026-06-26', '21:00', 'Lumen Field, Seattle', 'URU', 'KSA'),
+  m('GH-5', 'group', 'H', 3, '2026-06-26', '21:00', 'Gillette Stadium, Boston', 'CPV', 'KSA'),
+  m('GH-6', 'group', 'H', 3, '2026-06-26', '21:00', 'Lumen Field, Seattle', 'URU', 'ESP'),
   // Grupo I
   m('GI-1', 'group', 'I', 1, '2026-06-16', '16:00', 'MetLife Stadium, Nova Jersey', 'FRA', 'SEN'),
   m('GI-2', 'group', 'I', 1, '2026-06-16', '19:00', 'Rose Bowl, Pasadena', 'IRQ', 'NOR'),
