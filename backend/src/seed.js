@@ -18,14 +18,30 @@ export async function runMigrations() {
   await query(schema);
 }
 
-/** Corrige calendário oficial já gravado (idempotente). */
-export async function applyScheduleCorrections() {
-  await query(
-    `UPDATE matches SET
-       match_date = $2, match_time = $3, venue = $4, home_team = $5, away_team = $6
-     WHERE id = $1`,
-    ['GD-4', '2026-06-20', '00:00', "Levi's Stadium, San Francisco", 'TUR', 'PAR']
-  );
+/** Sincroniza calendário oficial (BRT) no banco — idempotente. */
+export async function syncScheduleFromSource() {
+  for (const m of ALL_MATCHES) {
+    await query(
+      `UPDATE matches SET
+         phase = $2, "group" = $3, matchday = $4,
+         match_date = $5, match_time = $6, venue = $7,
+         home_team = $8, away_team = $9, label = $10
+       WHERE id = $1`,
+      [
+        m.id,
+        m.phase,
+        m.group,
+        m.matchday,
+        m.date,
+        m.time,
+        m.venue,
+        m.home,
+        m.away,
+        m.label,
+      ]
+    );
+  }
+  console.log(`Calendário no banco atualizado (${ALL_MATCHES.length} jogos).`);
 }
 
 export async function seedDatabase() {
@@ -131,7 +147,7 @@ export async function initDatabase() {
     }
   }
   await runMigrations();
-  await applyScheduleCorrections();
+  await syncScheduleFromSource();
   await runPoolMigrations();
   await runStickerMigrations();
   await seedDatabase();
