@@ -22,7 +22,7 @@ export const GROUP_MATCHES = [
   m('GA-1', 'group', 'A', 1, '2026-06-11', '16:00', 'Estádio Azteca, Cidade do México', 'MEX', 'RSA'),
   m('GA-2', 'group', 'A', 1, '2026-06-11', '23:00', 'Estádio Akron, Guadalajara', 'KOR', 'CZE'),
   m('GA-3', 'group', 'A', 2, '2026-06-18', '22:00', 'Estádio Azteca, Cidade do México', 'MEX', 'KOR'),
-  m('GA-4', 'group', 'A', 2, '2026-06-18', '13:00', 'Estádio BBVA, Monterrey', 'RSA', 'CZE'),
+  m('GA-4', 'group', 'A', 2, '2026-06-18', '13:00', 'Estádio BBVA, Monterrey', 'CZE', 'RSA'),
   m('GA-5', 'group', 'A', 3, '2026-06-24', '22:00', 'Estádio Azteca, Cidade do México', 'CZE', 'MEX'),
   m('GA-6', 'group', 'A', 3, '2026-06-24', '22:00', 'Estádio BBVA, Monterrey', 'RSA', 'KOR'),
   // Grupo B
@@ -37,15 +37,15 @@ export const GROUP_MATCHES = [
   m('GC-2', 'group', 'C', 1, '2026-06-13', '22:00', 'Gillette Stadium, Boston', 'HAI', 'SCO'),
   m('GC-3', 'group', 'C', 2, '2026-06-19', '19:00', 'Gillette Stadium, Boston', 'SCO', 'MAR'),
   m('GC-4', 'group', 'C', 2, '2026-06-19', '21:30', 'Lincoln Financial Field, Filadélfia', 'BRA', 'HAI'),
-  m('GC-5', 'group', 'C', 3, '2026-06-24', '19:00', 'Hard Rock Stadium, Miami', 'SCO', 'BRA'),
-  m('GC-6', 'group', 'C', 3, '2026-06-24', '19:00', 'Mercedes-Benz Stadium, Atlanta', 'MAR', 'HAI'),
+  m('GC-5', 'group', 'C', 3, '2026-06-24', '19:00', 'Hard Rock Stadium, Miami', 'MAR', 'HAI'),
+  m('GC-6', 'group', 'C', 3, '2026-06-24', '19:00', 'Mercedes-Benz Stadium, Atlanta', 'SCO', 'BRA'),
   // Grupo D
   m('GD-1', 'group', 'D', 1, '2026-06-12', '22:00', 'SoFi Stadium, Los Angeles', 'USA', 'PAR'),
   m('GD-2', 'group', 'D', 1, '2026-06-14', '01:00', 'BC Place, Vancouver', 'AUS', 'TUR'),
   m('GD-3', 'group', 'D', 2, '2026-06-19', '16:00', 'Lumen Field, Seattle', 'USA', 'AUS'),
   m('GD-4', 'group', 'D', 2, '2026-06-20', '01:00', 'Levi\'s Stadium, San Francisco', 'TUR', 'PAR'),
-  m('GD-5', 'group', 'D', 3, '2026-06-25', '23:00', 'SoFi Stadium, Los Angeles', 'PAR', 'AUS'),
-  m('GD-6', 'group', 'D', 3, '2026-06-25', '23:00', 'Levi\'s Stadium, San Francisco', 'TUR', 'USA'),
+  m('GD-5', 'group', 'D', 3, '2026-06-25', '23:00', 'SoFi Stadium, Los Angeles', 'TUR', 'USA'),
+  m('GD-6', 'group', 'D', 3, '2026-06-25', '23:00', 'Levi\'s Stadium, San Francisco', 'PAR', 'AUS'),
   // Grupo E
   m('GE-1', 'group', 'E', 1, '2026-06-14', '14:00', 'NRG Stadium, Houston', 'GER', 'CUW'),
   m('GE-2', 'group', 'E', 1, '2026-06-14', '20:00', 'Lincoln Financial Field, Filadélfia', 'CIV', 'ECU'),
@@ -76,11 +76,11 @@ export const GROUP_MATCHES = [
   m('GH-6', 'group', 'H', 3, '2026-06-26', '21:00', 'Lumen Field, Seattle', 'URU', 'KSA'),
   // Grupo I
   m('GI-1', 'group', 'I', 1, '2026-06-16', '16:00', 'MetLife Stadium, Nova Jersey', 'FRA', 'SEN'),
-  m('GI-2', 'group', 'I', 1, '2026-06-16', '19:00', 'Rose Bowl, Pasadena', 'NOR', 'IRQ'),
-  m('GI-3', 'group', 'I', 2, '2026-06-22', '18:00', 'Lincoln Financial Field, Filadélfia', 'FRA', 'NOR'),
-  m('GI-4', 'group', 'I', 2, '2026-06-22', '21:00', 'Levi\'s Stadium, San Francisco', 'IRQ', 'SEN'),
-  m('GI-5', 'group', 'I', 3, '2026-06-26', '16:00', 'Hard Rock Stadium, Miami', 'IRQ', 'FRA'),
-  m('GI-6', 'group', 'I', 3, '2026-06-26', '16:00', 'Gillette Stadium, Boston', 'SEN', 'NOR'),
+  m('GI-2', 'group', 'I', 1, '2026-06-16', '19:00', 'Rose Bowl, Pasadena', 'IRQ', 'NOR'),
+  m('GI-3', 'group', 'I', 2, '2026-06-22', '18:00', 'Lincoln Financial Field, Filadélfia', 'FRA', 'IRQ'),
+  m('GI-4', 'group', 'I', 2, '2026-06-22', '21:00', 'Levi\'s Stadium, San Francisco', 'NOR', 'SEN'),
+  m('GI-5', 'group', 'I', 3, '2026-06-26', '16:00', 'Hard Rock Stadium, Miami', 'SEN', 'IRQ'),
+  m('GI-6', 'group', 'I', 3, '2026-06-26', '16:00', 'Gillette Stadium, Boston', 'NOR', 'FRA'),
   // Grupo J
   m('GJ-1', 'group', 'J', 1, '2026-06-16', '22:00', 'Arrowhead Stadium, Kansas City', 'ARG', 'ALG'),
   m('GJ-2', 'group', 'J', 1, '2026-06-17', '01:00', 'Levi\'s Stadium, San Francisco', 'AUT', 'JOR'),
@@ -100,8 +100,8 @@ export const GROUP_MATCHES = [
   m('GL-2', 'group', 'L', 1, '2026-06-17', '20:00', 'BMO Field, Toronto', 'GHA', 'PAN'),
   m('GL-3', 'group', 'L', 2, '2026-06-23', '17:00', 'MetLife Stadium, Nova Jersey', 'ENG', 'GHA'),
   m('GL-4', 'group', 'L', 2, '2026-06-23', '20:00', 'SoFi Stadium, Los Angeles', 'PAN', 'CRO'),
-  m('GL-5', 'group', 'L', 3, '2026-06-27', '18:00', 'Lincoln Financial Field, Filadélfia', 'PAN', 'ENG'),
-  m('GL-6', 'group', 'L', 3, '2026-06-27', '18:00', 'Lumen Field, Seattle', 'CRO', 'GHA'),
+  m('GL-5', 'group', 'L', 3, '2026-06-27', '18:00', 'Lincoln Financial Field, Filadélfia', 'CRO', 'GHA'),
+  m('GL-6', 'group', 'L', 3, '2026-06-27', '18:00', 'Lumen Field, Seattle', 'PAN', 'ENG'),
 ];
 
 export const KNOCKOUT_MATCHES = [
