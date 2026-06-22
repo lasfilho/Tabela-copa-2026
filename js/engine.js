@@ -312,8 +312,8 @@ export function thirdPlaceRanking(data) {
   return data.groups.map((g) => {
     const standings = computeGroupStandings(g.id, data.matches, g.teams);
     const third = standings[2];
-    return third?.played ? { ...third, group: g.id } : null;
-  }).filter(Boolean).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    return third ? { ...third, group: g.id } : null;
+  }).filter(Boolean).sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.code.localeCompare(b.code));
 }
 
 export function filterMatches(matches, filters, teamMap = null) {

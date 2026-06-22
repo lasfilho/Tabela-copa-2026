@@ -9,7 +9,7 @@ import {
   teamScorers, normalizeScorers,
   formatDate, formatDateShort, formatMatchTime, isToday, statusLabel, phaseLabel,
 } from './engine.js';
-import { groupProgress } from './knockout-resolver.js';
+import { groupProgress, isBracketProjected } from './knockout-resolver.js';
 import { matchKickoff } from './match-status.js';
 import { renderKnockoutBracket } from './bracket-view.js';
 import { buildPermissions } from './permissions.js';
@@ -540,7 +540,7 @@ export function renderKnockout(data, state) {
   document.getElementById('bracket-wrap').innerHTML = renderKnockoutBracket(data, {
     canEditScores: perms.canEditScores,
     autoSaveScores: perms.mode === 'simulation',
-  });
+  }, { projected: isBracketProjected(data) });
 }
 
 export function renderTeams(data, state, onTeamClick) {

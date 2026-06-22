@@ -81,7 +81,7 @@ function bracketScoreCell(match, side, canEdit) {
   return `<span class="bracket-slot__val">${val != null ? val : '–'}</span>`;
 }
 
-function renderTeamBox(data, code, winner, align) {
+function renderTeamBox(data, code, winner, align, projected = false) {
   const won = code && winner === code;
   const tbd = !code;
 
@@ -91,18 +91,19 @@ function renderTeamBox(data, code, winner, align) {
     </div>`;
   }
 
-  return `<div class="bracket-slot__team ${won ? 'bracket-slot__team--winner' : ''}" title="${teamFullName(data, code)}">
+  const prov = projected ? 'Provisório (classificação atual) — ' : '';
+  return `<div class="bracket-slot__team ${won ? 'bracket-slot__team--winner' : ''}${projected ? ' bracket-slot__team--projected' : ''}" title="${prov}${teamFullName(data, code)}">
     <img class="bracket-slot__flag" src="${flagUrl(data.teamMap[code])}" alt="" width="22" height="15" />
     <span class="bracket-slot__name">${bracketTeamName(data, code)}</span>
   </div>`;
 }
 
-function renderSlot(data, match, side, winner, align, canEdit) {
+function renderSlot(data, match, side, winner, align, canEdit, projected = false) {
   const code = side === 'home' ? match.home : match.away;
   const won = code && winner === code;
   const scoreFirst = align !== 'right';
   const scoreHtml = `<div class="bracket-slot__score">${bracketScoreCell(match, side, canEdit)}</div>`;
-  const teamHtml = renderTeamBox(data, code, winner, align);
+  const teamHtml = renderTeamBox(data, code, winner, align, projected && !!code);
 
   return `<div class="bracket-slot${won ? ' bracket-slot--winner' : ''}">
     ${scoreFirst ? scoreHtml + teamHtml : teamHtml + scoreHtml}
@@ -119,6 +120,7 @@ function renderBracketFixture(data, match, helpers, align = 'left') {
   const alignClass = align === 'right' ? 'bracket-fixture--right' : align === 'center' ? 'bracket-fixture--center' : 'bracket-fixture--left';
   const liveClass = match.status === 'live' ? 'bracket-fixture--live' : '';
   const finishedClass = match.status === 'finished' ? 'bracket-fixture--finished' : '';
+  const projectedClass = match.bracketProjected ? 'bracket-fixture--projected' : '';
 
   const editorOpen = canEditScores
     ? `<div class="score-editor score-editor--bracket${autoSaveScores ? ' score-editor--autosave' : ''}" data-match-id="${match.id}" data-phase="${match.phase}">`
@@ -127,10 +129,10 @@ function renderBracketFixture(data, match, helpers, align = 'left') {
     ? `<button type="button" class="visually-hidden" data-save-score="${match.id}">Salvar</button></div>`
     : '</div>';
 
-  return `<div class="bracket-fixture ${alignClass} ${liveClass} ${finishedClass}" data-match="${match.id}" title="${match.label || match.id}">
+  return `<div class="bracket-fixture ${alignClass} ${liveClass} ${finishedClass} ${projectedClass}" data-match="${match.id}" title="${match.label || match.id}">
     ${editorOpen}
-      ${renderSlot(data, match, 'home', winner, align, canEditScores)}
-      ${renderSlot(data, match, 'away', winner, align, canEditScores)}
+      ${renderSlot(data, match, 'home', winner, align, canEditScores, match.bracketProjected)}
+      ${renderSlot(data, match, 'away', winner, align, canEditScores, match.bracketProjected)}
     ${editorClose}
   </div>`;
 }
@@ -152,13 +154,15 @@ function renderSubtree(node, data, byId, helpers, align) {
   </div>`;
 }
 
-export function renderKnockoutBracket(data, helpers) {
+export function renderKnockoutBracket(data, helpers, { projected = false } = {}) {
   const byId = matchMap(data);
+  const intro = projected
+    ? 'Chaveamento com base na <strong>classificação atual</strong> dos grupos — cruzamentos provisórios, atualizados a cada rodada.'
+    : 'Chaveamento eliminatório · classificação da fase de grupos confirmada.';
 
   return `
-    <p class="bracket-intro">
-      Chaveamento eliminatório · placar à esquerda/direita · seleções preenchidas conforme a classificação
-    </p>
+    <p class="bracket-intro">${intro}</p>
+    ${projected ? '<p class="bracket-intro bracket-intro--note">Jogos em itálico podem mudar conforme os resultados da 3ª rodada.</p>' : ''}
     <div class="bracket-championship">
       <div class="bracket-side bracket-side--left">
         ${renderSubtree(LEFT_TREE, data, byId, helpers, 'left')}

@@ -1,15 +1,17 @@
 /**
- * Preenche mata-mata a partir da fase de grupos e propaga vencedores.
+ * Preenche mata-mata a partir da classificação dos grupos (atual ou final)
+ * e propaga vencedores nas fases seguintes.
  */
 import { computeGroupStandings, getWinner, thirdPlaceRanking } from './engine.js';
+import { teamShortName } from './team-names.js';
 
 function posMap(data) {
   const map = { first: {}, second: {}, third: {} };
   data.groups.forEach((g) => {
     const st = computeGroupStandings(g.id, data.matches, g.teams);
-    if (st[0]?.played) map.first[g.id] = st[0].code;
-    if (st[1]?.played) map.second[g.id] = st[1].code;
-    if (st[2]?.played) map.third[g.id] = st[2].code;
+    if (st[0]) map.first[g.id] = st[0].code;
+    if (st[1]) map.second[g.id] = st[1].code;
+    if (st[2]) map.third[g.id] = st[2].code;
   });
   return map;
 }
@@ -62,11 +64,17 @@ const BRACKET_FLOW = {
   FINAL: ['SF-1', 'SF-2'],
 };
 
-function allGroupMatchesDone(data) {
+export function allGroupMatchesDone(data) {
   return data.groups.every((g) => {
     const gm = data.matches.filter((m) => m.phase === 'group' && m.group === g.id);
     return gm.length === 6 && gm.every((m) => m.status === 'finished');
   });
+}
+
+function matchupLabel(data, home, away, projected = false) {
+  if (!home || !away) return null;
+  const suffix = projected ? ' (provisório)' : '';
+  return `${teamShortName(data, home)} × ${teamShortName(data, away)}${suffix}`;
 }
 
 function feederWinner(byId, winners, matchId) {
@@ -81,7 +89,7 @@ function feederLoser(byId, matchId) {
   return loserOf(src);
 }
 
-function fillR32FromGroups(byId, data) {
+function fillR32FromGroups(byId, data, projected) {
   const positions = posMap(data);
   const ranking = thirdPlaceRanking(data);
   const usedThirds = new Set();
@@ -92,20 +100,13 @@ function fillR32FromGroups(byId, data) {
     const { home, away } = rule(positions, usedThirds, ranking);
     m.home = home ?? null;
     m.away = away ?? null;
+    m.bracketProjected = projected;
+    const lbl = matchupLabel(data, home, away, projected);
+    if (lbl) m.label = lbl;
   });
 }
 
-function clearR32Slots(byId) {
-  Object.keys(R32_RULES).forEach((id) => {
-    const m = byId[id];
-    if (m) {
-      m.home = null;
-      m.away = null;
-    }
-  });
-}
-
-function propagateKnockoutRound(byId) {
+function propagateKnockoutRound(byId, data) {
   const tiers = [
     ['R16-1', 'R16-2', 'R16-3', 'R16-4', 'R16-5', 'R16-6', 'R16-7', 'R16-8'],
     ['QF-1', 'QF-2', 'QF-3', 'QF-4'],
@@ -129,6 +130,9 @@ function propagateKnockoutRound(byId) {
         m.home = feederWinner(byId, winners, a);
         m.away = feederWinner(byId, winners, b);
       }
+
+      const lbl = matchupLabel(data, m.home, m.away, false);
+      if (lbl) m.label = lbl;
     }
   }
 }
@@ -150,14 +154,10 @@ export function resolveKnockoutBracket(data) {
   const matches = data.matches.map((m) => ({ ...m }));
   const byId = Object.fromEntries(matches.map((m) => [m.id, m]));
   const bracketData = { ...data, matches };
+  const projected = !allGroupMatchesDone(bracketData);
 
-  if (allGroupMatchesDone(bracketData)) {
-    fillR32FromGroups(byId, bracketData);
-  } else {
-    clearR32Slots(byId);
-  }
-
-  propagateKnockoutRound(byId);
+  fillR32FromGroups(byId, bracketData, projected);
+  propagateKnockoutRound(byId, bracketData);
 
   return matches;
 }
@@ -166,4 +166,8 @@ export function groupProgress(data, groupId) {
   const gm = data.matches.filter((m) => m.phase === 'group' && m.group === groupId);
   const done = gm.filter((m) => m.status === 'finished').length;
   return { total: gm.length, done };
+}
+
+export function isBracketProjected(data) {
+  return !allGroupMatchesDone(data);
 }

@@ -1312,6 +1312,23 @@ body[data-active-mode="simulation"] #sim-clear-btn:not([hidden]):hover {
   -webkit-overflow-scrolling: touch;
 }
 
+.bracket-intro--note {
+  margin-top: -0.35rem;
+  font-size: 0.82rem;
+  color: var(--accent);
+}
+
+.bracket-fixture--projected {
+  outline: 1px dashed rgba(61, 255, 170, 0.35);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.bracket-slot__team--projected .bracket-slot__name {
+  font-style: italic;
+  opacity: 0.92;
+}
+
 .bracket-intro,
 .bracket-hint {
   margin: 0 0 1rem;
