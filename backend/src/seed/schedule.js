@@ -1,7 +1,7 @@
 /**
  * Calendário oficial — horários em Brasília (BRT, UTC-3).
  * Fonte: ge.globo / FIFA (ver backend/src/seed/fifa-brt-times.js).
- * Para atualizar: node scripts/apply-brt-times.mjs && node scripts/sync-schedule.mjs
+ * Para atualizar: node scripts/apply-brt-times.mjs && node scripts/apply-fixtures.mjs && node scripts/sync-schedule.mjs && node scripts/validate-schedule.mjs
  */
 export const TOURNAMENT = {
   name: 'Copa do Mundo FIFA 2026',
