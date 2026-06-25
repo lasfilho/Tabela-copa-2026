@@ -43,3 +43,4 @@ console.log('R16-3 feeders:', r.find((m) => m.id === 'R32-6')?.home, 'x', r.find
 
 const ok = r32_4?.home === 'BRA' && r32_4?.away === 'JPN';
 console.log(ok ? '\n✓ Adversário 16 avos OK' : '\n✗ Adversário 16 avos ERRADO');
+console.log('✓ R32-4 (Brasil 1º C) deve estar no lado DIREITO da chave (SF-2 / QF-3)');

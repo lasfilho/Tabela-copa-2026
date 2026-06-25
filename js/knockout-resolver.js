@@ -55,11 +55,11 @@ const BRACKET_FLOW = {
   'R16-6': ['R32-9', 'R32-10'], // M94 — Seattle
   'R16-7': ['R32-15', 'R32-14'], // M95 — Atlanta
   'R16-8': ['R32-13', 'R32-16'], // M96 — Vancouver
-  // Quartas — FIFA M97–M100
-  'QF-1': ['R16-1', 'R16-2'],
-  'QF-2': ['R16-3', 'R16-4'],
-  'QF-3': ['R16-5', 'R16-6'],
-  'QF-4': ['R16-7', 'R16-8'],
+  // Quartas — FIFA M97–M100 (SF-1 = M97×M98 | SF-2 = M99×M100)
+  'QF-1': ['R16-1', 'R16-2'], // M97
+  'QF-2': ['R16-5', 'R16-6'], // M98 — metade esquerda (SF-1)
+  'QF-3': ['R16-3', 'R16-4'], // M99 — 1º C × 2º F → oitavas do Brasil líder
+  'QF-4': ['R16-7', 'R16-8'], // M100 — metade direita (SF-2)
   'SF-1': ['QF-1', 'QF-2'],
   'SF-2': ['QF-3', 'QF-4'],
   BRONZE: ['SF-1', 'SF-2'],

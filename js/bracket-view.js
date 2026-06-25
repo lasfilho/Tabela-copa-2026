@@ -1,11 +1,13 @@
 /**
  * Chaveamento visual — alinhado ao bracket fixo FIFA (M73–M104).
- * Metade esquerda: SF-1 (QF-1/QF-2). Metade direita: SF-2 (QF-3/QF-4).
+ * Metade esquerda (SF-1): QF-1 + QF-2. Metade direita (SF-2): QF-3 + QF-4.
+ * 1º Grupo C (R32-4) → lado direito. 2º Grupo C (R32-3) → lado esquerdo.
  */
 import { flagUrl } from './data-service.js';
 import { getWinner } from './engine.js';
 import { teamFullName, teamShortName } from './team-names.js';
 
+/** SF-1 — semifinal Dallas (M101): vencedores M97 e M98 */
 const LEFT_TREE = {
   id: 'SF-1',
   left: {
@@ -24,23 +26,6 @@ const LEFT_TREE = {
   right: {
     id: 'QF-2',
     left: {
-      id: 'R16-3',
-      left: { id: 'R32-4', leaf: true },
-      right: { id: 'R32-6', leaf: true },
-    },
-    right: {
-      id: 'R16-4',
-      left: { id: 'R32-7', leaf: true },
-      right: { id: 'R32-8', leaf: true },
-    },
-  },
-};
-
-const RIGHT_TREE = {
-  id: 'SF-2',
-  left: {
-    id: 'QF-3',
-    left: {
       id: 'R16-5',
       left: { id: 'R32-11', leaf: true },
       right: { id: 'R32-12', leaf: true },
@@ -49,6 +34,24 @@ const RIGHT_TREE = {
       id: 'R16-6',
       left: { id: 'R32-9', leaf: true },
       right: { id: 'R32-10', leaf: true },
+    },
+  },
+};
+
+/** SF-2 — semifinal Atlanta (M102): vencedores M99 e M100 */
+const RIGHT_TREE = {
+  id: 'SF-2',
+  left: {
+    id: 'QF-3',
+    left: {
+      id: 'R16-3',
+      left: { id: 'R32-4', leaf: true },
+      right: { id: 'R32-6', leaf: true },
+    },
+    right: {
+      id: 'R16-4',
+      left: { id: 'R32-7', leaf: true },
+      right: { id: 'R32-8', leaf: true },
     },
   },
   right: {
@@ -163,7 +166,7 @@ export function renderKnockoutBracket(data, helpers, { projected = false } = {})
 
   return `
     <p class="bracket-intro">${intro}</p>
-    ${projected ? '<p class="bracket-intro bracket-intro--note">Jogos em itálico podem mudar conforme os resultados da 3ª rodada.</p>' : ''}
+    ${projected ? '<p class="bracket-intro bracket-intro--note">Jogos em itálico podem mudar conforme os resultados da 3ª rodada. Líder do Grupo C fica no <strong>lado direito</strong> da chave (como no simulador ge).</p>' : ''}
     <div class="bracket-championship">
       <div class="bracket-side bracket-side--left">
         ${renderSubtree(LEFT_TREE, data, byId, helpers, 'left')}
