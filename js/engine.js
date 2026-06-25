@@ -21,33 +21,58 @@ export function emptyStanding(code) {
 
 export function computeGroupStandings(groupId, matches, teamIds) {
   const standings = Object.fromEntries(teamIds.map((c) => [c, emptyStanding(c)]));
-
-  matches
-    .filter((m) => m.phase === 'group' && m.group === groupId && m.status === 'finished')
-    .forEach((m) => {
-      const h = standings[m.home];
-      const a = standings[m.away];
-      if (!h || !a) return;
-      h.played++; a.played++;
-      h.gf += m.homeScore; h.ga += m.awayScore;
-      a.gf += m.awayScore; a.ga += m.homeScore;
-      if (m.homeScore > m.awayScore) {
-        h.won++; h.pts += 3; a.lost++;
-        h.form.push('W'); a.form.push('L');
-      } else if (m.homeScore < m.awayScore) {
-        a.won++; a.pts += 3; h.lost++;
-        a.form.push('W'); h.form.push('L');
-      } else {
-        h.drawn++; a.drawn++; h.pts++; a.pts++;
-        h.form.push('D'); a.form.push('D');
-      }
-      h.gd = h.gf - h.ga;
-      a.gd = a.gf - a.ga;
-    });
-
-  return Object.values(standings).sort(
-    (x, y) => y.pts - x.pts || y.gd - x.gd || y.gf - x.gf || x.code.localeCompare(y.code)
+  const groupMatches = matches.filter(
+    (m) => m.phase === 'group' && m.group === groupId && m.status === 'finished'
   );
+
+  groupMatches.forEach((m) => {
+    const h = standings[m.home];
+    const a = standings[m.away];
+    if (!h || !a) return;
+    h.played++; a.played++;
+    h.gf += m.homeScore; h.ga += m.awayScore;
+    a.gf += m.awayScore; a.ga += m.homeScore;
+    if (m.homeScore > m.awayScore) {
+      h.won++; h.pts += 3; a.lost++;
+      h.form.push('W'); a.form.push('L');
+    } else if (m.homeScore < m.awayScore) {
+      a.won++; a.pts += 3; h.lost++;
+      a.form.push('W'); h.form.push('L');
+    } else {
+      h.drawn++; a.drawn++; h.pts++; a.pts++;
+      h.form.push('D'); a.form.push('D');
+    }
+    h.gd = h.gf - h.ga;
+    a.gd = a.gf - a.ga;
+  });
+
+  const list = Object.values(standings);
+  const h2hPts = (codeA, codeB) => {
+    let ptsA = 0;
+    let ptsB = 0;
+    groupMatches.forEach((m) => {
+      if (m.home !== codeA && m.away !== codeA) return;
+      if (m.home !== codeB && m.away !== codeB) return;
+      if (m.homeScore > m.awayScore) {
+        if (m.home === codeA) ptsA += 3; else ptsB += 3;
+      } else if (m.homeScore < m.awayScore) {
+        if (m.away === codeA) ptsA += 3; else ptsB += 3;
+      } else {
+        ptsA += 1;
+        ptsB += 1;
+      }
+    });
+    return ptsB - ptsA;
+  };
+
+  return list.sort((x, y) => {
+    if (y.pts !== x.pts) return y.pts - x.pts;
+    if (y.gd !== x.gd) return y.gd - x.gd;
+    if (y.gf !== x.gf) return y.gf - x.gf;
+    const h2h = h2hPts(x.code, y.code);
+    if (h2h !== 0) return h2h;
+    return x.code.localeCompare(y.code);
+  });
 }
 
 export function teamStats(teamId, matches) {

@@ -1,5 +1,6 @@
 /**
- * Chaveamento visual — caixa de placar + caixa de seleção (bandeira e nome).
+ * Chaveamento visual — alinhado ao bracket fixo FIFA (M73–M104).
+ * Metade esquerda: SF-1 (QF-1/QF-2). Metade direita: SF-2 (QF-3/QF-4).
  */
 import { flagUrl } from './data-service.js';
 import { getWinner } from './engine.js';
@@ -11,25 +12,25 @@ const LEFT_TREE = {
     id: 'QF-1',
     left: {
       id: 'R16-1',
-      left: { id: 'R32-1', leaf: true },
-      right: { id: 'R32-3', leaf: true },
+      left: { id: 'R32-2', leaf: true },
+      right: { id: 'R32-5', leaf: true },
     },
     right: {
       id: 'R16-2',
-      left: { id: 'R32-2', leaf: true },
-      right: { id: 'R32-4', leaf: true },
+      left: { id: 'R32-1', leaf: true },
+      right: { id: 'R32-3', leaf: true },
     },
   },
   right: {
     id: 'QF-2',
     left: {
       id: 'R16-3',
-      left: { id: 'R32-5', leaf: true },
-      right: { id: 'R32-7', leaf: true },
+      left: { id: 'R32-4', leaf: true },
+      right: { id: 'R32-6', leaf: true },
     },
     right: {
       id: 'R16-4',
-      left: { id: 'R32-6', leaf: true },
+      left: { id: 'R32-7', leaf: true },
       right: { id: 'R32-8', leaf: true },
     },
   },
@@ -41,25 +42,25 @@ const RIGHT_TREE = {
     id: 'QF-3',
     left: {
       id: 'R16-5',
-      left: { id: 'R32-9', leaf: true },
-      right: { id: 'R32-11', leaf: true },
+      left: { id: 'R32-11', leaf: true },
+      right: { id: 'R32-12', leaf: true },
     },
     right: {
       id: 'R16-6',
-      left: { id: 'R32-10', leaf: true },
-      right: { id: 'R32-12', leaf: true },
+      left: { id: 'R32-9', leaf: true },
+      right: { id: 'R32-10', leaf: true },
     },
   },
   right: {
     id: 'QF-4',
     left: {
       id: 'R16-7',
-      left: { id: 'R32-13', leaf: true },
-      right: { id: 'R32-15', leaf: true },
+      left: { id: 'R32-15', leaf: true },
+      right: { id: 'R32-14', leaf: true },
     },
     right: {
       id: 'R16-8',
-      left: { id: 'R32-14', leaf: true },
+      left: { id: 'R32-13', leaf: true },
       right: { id: 'R32-16', leaf: true },
     },
   },
