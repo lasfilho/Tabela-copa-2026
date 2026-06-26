@@ -9,7 +9,7 @@ import {
   teamScorers, normalizeScorers,
   formatDate, formatDateShort, formatMatchTime, isToday, statusLabel, phaseLabel,
 } from './engine.js';
-import { groupProgress, isBracketProjected } from './knockout-resolver.js';
+import { groupProgress, isBracketProjected, getThirdPlaceBracketSlots } from './knockout-resolver.js';
 import { matchKickoff } from './match-status.js';
 import { renderKnockoutBracket } from './bracket-view.js';
 import { buildPermissions } from './permissions.js';
@@ -277,6 +277,8 @@ export function renderOverview(data, state) {
     ? recent.map((m) => matchRowHTML(data, m, state, true)).join('')
     : '<div class="empty">Nenhum resultado ainda</div>';
 
+  renderOverviewThirdPlaces(data, state);
+
   const agg = aggregateStats(data);
   document.getElementById('highlights').innerHTML = `
     <div class="highlight-item"><span>Média de gols/jogo</span><strong>${computeKPIs(data).avgGoals}</strong></div>
@@ -304,6 +306,48 @@ export function renderOverview(data, state) {
     const standings = computeGroupStandings(g.id, data.matches, g.teams);
     return renderStandingsTable(data, g.id, standings, state, qualifiedThirds, true);
   }).join('');
+}
+
+function renderOverviewThirdPlaces(data, state) {
+  const el = document.getElementById('overview-third-places');
+  if (!el) return;
+
+  const thirds = thirdPlaceRanking(data);
+  const slots = getThirdPlaceBracketSlots(data);
+
+  if (!thirds.length) {
+    el.innerHTML = '<div class="empty">Sem dados dos grupos</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <p class="third-place-overview__hint">Os 8 primeiros avançam aos 16 avos · destino conforme ranking e combinações de grupos FIFA</p>
+    <div class="third-place-overview__list" role="list">
+      ${thirds.map((t, i) => {
+        const qualified = i < 8;
+        const slot = slots[t.code];
+        const hl = isHighlighted(data, state, t.code);
+        const gd = t.gd > 0 ? `+${t.gd}` : String(t.gd);
+        let dest;
+        if (slot?.opponent) {
+          const vs = teamName(data, slot.opponent);
+          dest = `<span class="third-place-row__dest" title="Jogo ${slot.r32} nos 16 avos">vs ${vs}</span>`;
+        } else if (qualified) {
+          dest = '<span class="third-place-row__dest third-place-row__dest--muted">A definir</span>';
+        } else {
+          dest = '<span class="third-place-row__dest third-place-row__dest--out">—</span>';
+        }
+        return `
+          <div class="third-place-row ${qualified ? 'third-place-row--qualified' : ''} ${hl ? 'highlight' : ''}" role="listitem">
+            <span class="third-place-row__rank">${i + 1}º</span>
+            <img class="flag" src="${flagUrl(data.teamMap[t.code])}" alt="" />
+            <span class="third-place-row__team">${teamName(data, t.code)}</span>
+            <span class="third-place-row__group">3º ${t.group}</span>
+            <span class="third-place-row__stats">${t.pts} pts · ${gd} SG</span>
+            ${dest}
+          </div>`;
+      }).join('')}
+    </div>`;
 }
 
 function favBtn(id, state) {

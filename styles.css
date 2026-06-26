@@ -794,6 +794,106 @@ body[data-active-mode="simulation"] #sim-clear-btn:not([hidden]):hover {
 .grid { display: grid; gap: 1rem; margin-bottom: 1rem; }
 .grid--2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 
+.overview-side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.third-place-overview__hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.third-place-overview__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.third-place-row {
+  display: grid;
+  grid-template-columns: 2rem 1.25rem 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+.third-place-row:last-child { border-bottom: none; }
+
+.third-place-row--qualified {
+  background: rgba(255, 200, 87, 0.06);
+  margin: 0 -0.35rem;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.third-place-row--qualified .third-place-row__rank {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.third-place-row.highlight .third-place-row__team {
+  color: var(--gold);
+}
+
+.third-place-row__rank {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.third-place-row__team {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.third-place-row__group {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.third-place-row__stats {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.third-place-row__dest {
+  font-size: 0.72rem;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.third-place-row__dest--muted { color: var(--text-muted); font-weight: 500; }
+.third-place-row__dest--out { color: var(--text-muted); font-weight: 400; }
+
+@media (max-width: 480px) {
+  .third-place-row {
+    grid-template-columns: 1.75rem 1.1rem 1fr;
+    grid-template-rows: auto auto;
+  }
+  .third-place-row__group { grid-column: 3; }
+  .third-place-row__stats,
+  .third-place-row__dest {
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);

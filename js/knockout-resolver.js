@@ -66,6 +66,26 @@ const BRACKET_FLOW = {
   FINAL: ['SF-1', 'SF-2'],
 };
 
+/** Mapeia cada 3º colocado ao jogo dos 16 avos (R32) conforme regras FIFA atuais. */
+export function getThirdPlaceBracketSlots(data) {
+  const positions = posMap(data);
+  const ranking = thirdPlaceRanking(data);
+  const usedThirds = new Set();
+  const slots = {};
+
+  Object.entries(R32_RULES).forEach(([id, rule]) => {
+    const { home, away } = rule(positions, usedThirds, ranking);
+    if (ranking.some((t) => t.code === home)) {
+      slots[home] = { r32: id, side: 'home', opponent: away };
+    }
+    if (ranking.some((t) => t.code === away)) {
+      slots[away] = { r32: id, side: 'away', opponent: home };
+    }
+  });
+
+  return slots;
+}
+
 export function allGroupMatchesDone(data) {
   return data.groups.every((g) => {
     const gm = data.matches.filter((m) => m.phase === 'group' && m.group === g.id);
