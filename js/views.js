@@ -320,33 +320,60 @@ function renderOverviewThirdPlaces(data, state) {
     return;
   }
 
+  const rows = thirds.map((t, i) => {
+    const qualified = i < 8;
+    const slot = slots[t.code];
+    const hl = isHighlighted(data, state, t.code);
+    const gd = t.gd > 0 ? `+${t.gd}` : String(t.gd);
+    const name = teamName(data, t.code);
+    const dest = slot?.opponent
+      ? ` · 16 avos vs ${teamName(data, slot.opponent)}`
+      : '';
+    const tip = `3º do Grupo ${t.group}${dest}`.replace(/"/g, '&quot;');
+    const cutoff = i === 7 ? '<tr class="tpr-cutoff" aria-hidden="true"><td colspan="9"><span class="tpr-cutoff__line"></span></td></tr>' : '';
+    return `
+      <tr class="tpr-row ${qualified ? 'tpr-row--qualified' : ''} ${hl ? 'tpr-row--highlight' : ''}" title="${tip}">
+        <td class="tpr-rank">${i + 1}</td>
+        <td class="tpr-flag"><img class="flag" src="${flagUrl(data.teamMap[t.code])}" alt="" /></td>
+        <td class="tpr-team">${name}</td>
+        <td class="tpr-num">${t.played}</td>
+        <td class="tpr-num">${t.won}</td>
+        <td class="tpr-num">${t.drawn}</td>
+        <td class="tpr-num">${t.lost}</td>
+        <td class="tpr-num tpr-num--sg">${gd}</td>
+        <td class="tpr-pts"><span class="tpr-pts__badge">${t.pts}</span></td>
+      </tr>${cutoff}`;
+  }).join('');
+
   el.innerHTML = `
-    <p class="third-place-overview__hint">Os 8 primeiros avançam aos 16 avos · destino conforme ranking e combinações de grupos FIFA</p>
-    <div class="third-place-overview__list" role="list">
-      ${thirds.map((t, i) => {
-        const qualified = i < 8;
-        const slot = slots[t.code];
-        const hl = isHighlighted(data, state, t.code);
-        const gd = t.gd > 0 ? `+${t.gd}` : String(t.gd);
-        let dest;
-        if (slot?.opponent) {
-          const vs = teamName(data, slot.opponent);
-          dest = `<span class="third-place-row__dest" title="Jogo ${slot.r32} nos 16 avos">vs ${vs}</span>`;
-        } else if (qualified) {
-          dest = '<span class="third-place-row__dest third-place-row__dest--muted">A definir</span>';
-        } else {
-          dest = '<span class="third-place-row__dest third-place-row__dest--out">—</span>';
-        }
-        return `
-          <div class="third-place-row ${qualified ? 'third-place-row--qualified' : ''} ${hl ? 'highlight' : ''}" role="listitem">
-            <span class="third-place-row__rank">${i + 1}º</span>
-            <img class="flag" src="${flagUrl(data.teamMap[t.code])}" alt="" />
-            <span class="third-place-row__team">${teamName(data, t.code)}</span>
-            <span class="third-place-row__group">3º ${t.group}</span>
-            <span class="third-place-row__stats">${t.pts} pts · ${gd} SG</span>
-            ${dest}
-          </div>`;
-      }).join('')}
+    <div class="tpr-card">
+      <div class="tpr-card__frame">
+        <div class="tpr-card__inner">
+          <header class="tpr-header">
+            <span class="tpr-header__icon" aria-hidden="true">🏆</span>
+            <h3 class="tpr-header__title">Ranking de 3º lugar</h3>
+          </header>
+          <div class="tpr-table-wrap">
+            <table class="tpr-table">
+              <thead>
+                <tr>
+                  <th class="tpr-th tpr-th--rank" scope="col"><span class="visually-hidden">Posição</span></th>
+                  <th class="tpr-th tpr-th--flag" scope="col"><span class="visually-hidden">Bandeira</span></th>
+                  <th class="tpr-th tpr-th--team" scope="col"><span class="visually-hidden">Seleção</span></th>
+                  <th class="tpr-th tpr-stat" scope="col">J</th>
+                  <th class="tpr-th tpr-stat" scope="col">V</th>
+                  <th class="tpr-th tpr-stat" scope="col">E</th>
+                  <th class="tpr-th tpr-stat" scope="col">D</th>
+                  <th class="tpr-th tpr-stat" scope="col">SG</th>
+                  <th class="tpr-th tpr-stat tpr-stat--pts" scope="col">PTS</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <footer class="tpr-footer">FIFA WORLD CUP 2026™</footer>
+        </div>
+      </div>
     </div>`;
 }
 
