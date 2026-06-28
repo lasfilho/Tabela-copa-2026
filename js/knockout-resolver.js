@@ -3,6 +3,7 @@
  * e propaga vencedores nas fases seguintes.
  */
 import { computeGroupStandings, getWinner, thirdPlaceRanking } from './engine.js';
+import { ANNEX_C, WINNER_THIRD_SLOTS } from './fifa-annex-c.js';
 import { teamShortName } from './team-names.js';
 
 function posMap(data) {
@@ -16,33 +17,43 @@ function posMap(data) {
   return map;
 }
 
-function pickThird(candidates, used, ranking) {
-  for (const t of ranking) {
-    if (!candidates.includes(t.group)) continue;
-    if (used.has(t.code)) continue;
-    used.add(t.code);
-    return t.code;
+/** Chave Annex C: 8 grupos cujo 3º colocado classificou, em ordem alfabética. */
+export function annexCKey(data) {
+  const ranking = thirdPlaceRanking(data);
+  return ranking.slice(0, 8).map((t) => t.group).sort().join('');
+}
+
+/** Resolve 3º colocado por campeão de grupo (1A…1L) via tabela FIFA Annex C. */
+export function resolveAnnexCThirds(data, positions) {
+  const key = annexCKey(data);
+  const row = ANNEX_C[key];
+  if (!row) return null;
+
+  const out = {};
+  for (const [winnerGroup, source] of Object.entries(row)) {
+    const thirdGroup = source[1];
+    out[winnerGroup] = positions.third[thirdGroup] ?? null;
   }
-  return null;
+  return out;
 }
 
 const R32_RULES = {
-  'R32-1': (p, u, r) => ({ home: p.second.A, away: p.second.B }),
-  'R32-2': (p, u, r) => ({ home: p.first.E, away: pickThird(['A', 'B', 'C', 'D', 'F'], u, r) }),
+  'R32-1': (p) => ({ home: p.second.A, away: p.second.B }),
+  'R32-2': (p, t) => ({ home: p.first.E, away: t?.E ?? null }),
   'R32-3': (p) => ({ home: p.first.F, away: p.second.C }),
   'R32-4': (p) => ({ home: p.first.C, away: p.second.F }),
-  'R32-5': (p, u, r) => ({ home: p.first.I, away: pickThird(['C', 'D', 'F', 'G', 'H'], u, r) }),
+  'R32-5': (p, t) => ({ home: p.first.I, away: t?.I ?? null }),
   'R32-6': (p) => ({ home: p.second.E, away: p.second.I }),
-  'R32-7': (p, u, r) => ({ home: p.first.A, away: pickThird(['C', 'E', 'F', 'H', 'I'], u, r) }),
-  'R32-8': (p, u, r) => ({ home: p.first.L, away: pickThird(['E', 'H', 'I', 'J', 'K'], u, r) }),
-  'R32-9': (p, u, r) => ({ home: p.first.D, away: pickThird(['B', 'E', 'F', 'I', 'J'], u, r) }),
-  'R32-10': (p, u, r) => ({ home: p.first.G, away: pickThird(['A', 'E', 'H', 'I', 'J'], u, r) }),
+  'R32-7': (p, t) => ({ home: p.first.A, away: t?.A ?? null }),
+  'R32-8': (p, t) => ({ home: p.first.L, away: t?.L ?? null }),
+  'R32-9': (p, t) => ({ home: p.first.D, away: t?.D ?? null }),
+  'R32-10': (p, t) => ({ home: p.first.G, away: t?.G ?? null }),
   'R32-11': (p) => ({ home: p.second.K, away: p.second.L }),
   'R32-12': (p) => ({ home: p.first.H, away: p.second.J }),
-  'R32-13': (p, u, r) => ({ home: p.first.B, away: pickThird(['E', 'F', 'G', 'I', 'J'], u, r) }),
+  'R32-13': (p, t) => ({ home: p.first.B, away: t?.B ?? null }),
   'R32-14': (p) => ({ home: p.second.D, away: p.second.G }),
   'R32-15': (p) => ({ home: p.first.J, away: p.second.H }),
-  'R32-16': (p, u, r) => ({ home: p.first.K, away: pickThird(['D', 'E', 'I', 'J', 'L'], u, r) }),
+  'R32-16': (p, t) => ({ home: p.first.K, away: t?.K ?? null }),
 };
 
 const BRACKET_FLOW = {
@@ -66,22 +77,22 @@ const BRACKET_FLOW = {
   FINAL: ['SF-1', 'SF-2'],
 };
 
-/** Mapeia cada 3º colocado ao jogo dos 16 avos (R32) conforme regras FIFA atuais. */
+/** Mapeia cada 3º colocado ao jogo dos 16 avos (R32) conforme Annex C FIFA. */
 export function getThirdPlaceBracketSlots(data) {
   const positions = posMap(data);
-  const ranking = thirdPlaceRanking(data);
-  const usedThirds = new Set();
+  const thirds = resolveAnnexCThirds(data, positions);
   const slots = {};
 
-  Object.entries(R32_RULES).forEach(([id, rule]) => {
-    const { home, away } = rule(positions, usedThirds, ranking);
-    if (ranking.some((t) => t.code === home)) {
-      slots[home] = { r32: id, side: 'home', opponent: away };
-    }
-    if (ranking.some((t) => t.code === away)) {
-      slots[away] = { r32: id, side: 'away', opponent: home };
-    }
-  });
+  if (!thirds) return slots;
+
+  for (const [winnerGroup, teamCode] of Object.entries(thirds)) {
+    if (!teamCode) continue;
+    const r32 = WINNER_THIRD_SLOTS[winnerGroup];
+    const rule = R32_RULES[r32]?.(positions, thirds);
+    if (!rule) continue;
+    const opponent = rule.home === teamCode ? rule.away : rule.home;
+    slots[teamCode] = { r32, side: rule.home === teamCode ? 'home' : 'away', opponent };
+  }
 
   return slots;
 }
@@ -113,13 +124,12 @@ function feederLoser(byId, matchId) {
 
 function fillR32FromGroups(byId, data, projected) {
   const positions = posMap(data);
-  const ranking = thirdPlaceRanking(data);
-  const usedThirds = new Set();
+  const thirds = resolveAnnexCThirds(data, positions);
 
   Object.entries(R32_RULES).forEach(([id, rule]) => {
     const m = byId[id];
     if (!m) return;
-    const { home, away } = rule(positions, usedThirds, ranking);
+    const { home, away } = rule(positions, thirds);
     m.home = home ?? null;
     m.away = away ?? null;
     m.bracketProjected = projected;
