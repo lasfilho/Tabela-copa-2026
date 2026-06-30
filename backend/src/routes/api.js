@@ -7,6 +7,7 @@ import { getSportsApiStatus } from '../sportsdb-fetch.js';
 import { fetchTopScorersRows, backfillMissingGoals, importMissingResultsFromOpenFootball, purgeLegacyCorrectedGoals } from '../goal-sync.js';
 import { authMiddleware, canWriteScores, requireAdmin } from '../auth.js';
 import { recalculatePoolsForMatch } from '../pool/pool-ranking.js';
+import { validateKnockoutFinish } from '../match-score.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -25,6 +26,9 @@ function mapMatchRow(row, mode = 'real') {
     label: row.label,
     homeScore: row.home_score ?? null,
     awayScore: row.away_score ?? null,
+    homePenalties: row.home_penalties ?? null,
+    awayPenalties: row.away_penalties ?? null,
+    resultDetail: row.result_detail ?? null,
     status: row.status ?? 'scheduled',
   };
   match.status = resolveMatchStatus(match, new Date(), {
@@ -66,7 +70,8 @@ router.get('/bootstrap', async (req, res, next) => {
         GROUP BY g.id, g.name ORDER BY g.id
       `),
       query(`
-        SELECT m.*, r.home_score, r.away_score, COALESCE(r.status, 'scheduled') AS status
+        SELECT m.*, r.home_score, r.away_score, r.home_penalties, r.away_penalties, r.result_detail,
+          COALESCE(r.status, 'scheduled') AS status
         FROM matches m
         LEFT JOIN match_results r ON r.match_id = m.id AND r.mode = $1
         ORDER BY m.match_date, m.match_time, m.id
@@ -145,7 +150,7 @@ router.put('/matches/:id/score', async (req, res, next) => {
           : 'Faça login para editar placares na simulação.',
       });
     }
-    const { homeScore, awayScore } = req.body;
+    const { homeScore, awayScore, homePenalties, awayPenalties, resultDetail } = req.body;
 
     const matchRes = await query(`SELECT id, phase FROM matches WHERE id = $1`, [id]);
     if (!matchRes.rows.length) return res.status(404).json({ error: 'Jogo não encontrado' });
@@ -153,20 +158,27 @@ router.put('/matches/:id/score', async (req, res, next) => {
     const phase = matchRes.rows[0].phase;
     const home = homeScore === '' || homeScore == null ? null : Number(homeScore);
     const away = awayScore === '' || awayScore == null ? null : Number(awayScore);
+    const homePen = homePenalties === '' || homePenalties == null ? null : Number(homePenalties);
+    const awayPen = awayPenalties === '' || awayPenalties == null ? null : Number(awayPenalties);
+    const detail = ['ft', 'aet', 'pen'].includes(resultDetail) ? resultDetail : null;
     const finishRequested = req.body.finish === true || req.body.status === 'finished';
     let resultStatus = null;
 
     if (home != null && away != null) {
-      if (phase !== 'group' && home === away) {
-        return res.status(400).json({ error: 'No mata-mata é necessário um vencedor (placares diferentes)' });
+      const finishing = finishRequested || mode === 'simulation';
+      const knockoutErr = validateKnockoutFinish(phase, {
+        homeScore: home,
+        awayScore: away,
+        homePenalties: homePen,
+        awayPenalties: awayPen,
+      });
+      if (knockoutErr && finishing) {
+        return res.status(400).json({ error: knockoutErr });
       }
 
       if (mode === 'simulation') {
         resultStatus = 'finished';
       } else {
-        // Atualização manual em modo real NÃO encerra o jogo. Mantém "live"
-        // (preservando "finished" se já estava encerrado) e só encerra quando
-        // o admin pede explicitamente (finish/status=finished).
         const existing = await query(
           `SELECT status FROM match_results WHERE match_id = $1 AND mode = $2`,
           [id, mode]
@@ -176,21 +188,28 @@ router.put('/matches/:id/score', async (req, res, next) => {
       }
 
       await query(
-        `INSERT INTO match_results (match_id, mode, home_score, away_score, status, updated_at)
-         VALUES ($1,$2,$3,$4,$5,NOW())
+        `INSERT INTO match_results (
+           match_id, mode, home_score, away_score, status,
+           home_penalties, away_penalties, result_detail, updated_at
+         )
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
          ON CONFLICT (match_id, mode) DO UPDATE SET
            home_score = EXCLUDED.home_score,
            away_score = EXCLUDED.away_score,
            status = EXCLUDED.status,
+           home_penalties = EXCLUDED.home_penalties,
+           away_penalties = EXCLUDED.away_penalties,
+           result_detail = EXCLUDED.result_detail,
            updated_at = NOW()`,
-        [id, mode, home, away, resultStatus]
+        [id, mode, home, away, resultStatus, homePen, awayPen, detail]
       );
     } else {
       await query(`DELETE FROM match_results WHERE match_id = $1 AND mode = $2`, [id, mode]);
     }
 
     const { rows } = await query(`
-      SELECT m.*, r.home_score, r.away_score, COALESCE(r.status, 'scheduled') AS status
+      SELECT m.*, r.home_score, r.away_score, r.home_penalties, r.away_penalties, r.result_detail,
+        COALESCE(r.status, 'scheduled') AS status
       FROM matches m
       LEFT JOIN match_results r ON r.match_id = m.id AND r.mode = $2
       WHERE m.id = $1
@@ -222,17 +241,27 @@ router.put('/matches/:id/status', async (req, res, next) => {
 
     const status = req.body.status === 'finished' ? 'finished' : 'live';
 
-    const matchRes = await query(`SELECT id FROM matches WHERE id = $1`, [id]);
+    const matchRes = await query(`SELECT id, phase FROM matches WHERE id = $1`, [id]);
     if (!matchRes.rows.length) return res.status(404).json({ error: 'Jogo não encontrado' });
 
     const existing = await query(
-      `SELECT home_score, away_score FROM match_results WHERE match_id = $1 AND mode = $2`,
+      `SELECT home_score, away_score, home_penalties, away_penalties
+       FROM match_results WHERE match_id = $1 AND mode = $2`,
       [id, mode]
     );
     const row0 = existing.rows[0];
 
     if (status === 'finished' && (!row0 || row0.home_score == null || row0.away_score == null)) {
       return res.status(400).json({ error: 'Defina o placar antes de encerrar a partida' });
+    }
+    if (status === 'finished') {
+      const knockoutErr = validateKnockoutFinish(matchRes.rows[0].phase, {
+        homeScore: row0.home_score,
+        awayScore: row0.away_score,
+        homePenalties: row0.home_penalties,
+        awayPenalties: row0.away_penalties,
+      });
+      if (knockoutErr) return res.status(400).json({ error: knockoutErr });
     }
     if (status === 'live' && !row0) {
       return res.status(400).json({ error: 'Não há placar registrado para reabrir' });
@@ -245,7 +274,8 @@ router.put('/matches/:id/status', async (req, res, next) => {
     );
 
     const { rows } = await query(`
-      SELECT m.*, r.home_score, r.away_score, COALESCE(r.status, 'scheduled') AS status
+      SELECT m.*, r.home_score, r.away_score, r.home_penalties, r.away_penalties, r.result_detail,
+        COALESCE(r.status, 'scheduled') AS status
       FROM matches m
       LEFT JOIN match_results r ON r.match_id = m.id AND r.mode = $2
       WHERE m.id = $1
@@ -280,7 +310,7 @@ router.get('/scores/export', async (req, res, next) => {
   try {
     const mode = req.query.mode === 'simulation' ? 'simulation' : 'real';
     const { rows } = await query(`
-      SELECT match_id, home_score, away_score, status, updated_at
+      SELECT match_id, home_score, away_score, home_penalties, away_penalties, result_detail, status, updated_at
       FROM match_results WHERE mode = $1 ORDER BY updated_at
     `, [mode]);
     res.json({ mode, exportedAt: new Date().toISOString(), scores: rows });

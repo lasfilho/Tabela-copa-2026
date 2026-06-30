@@ -19,6 +19,7 @@ import {
   getSportsApiStatus,
 } from './sportsdb-fetch.js';
 import { finalizeStaleLiveResults } from './match-status.js';
+import { mapResultDetail, parsePenaltiesFromEvent } from './match-score.js';
 
 const LEAGUE_ID = '4429';
 const SEASON = '2026';
@@ -116,14 +117,21 @@ function formatMatchDate(value) {
 
 async function getCurrentResult(matchId) {
   const { rows } = await query(
-    `SELECT home_score, away_score, status FROM match_results
-     WHERE match_id = $1 AND mode = 'real'`,
+    `SELECT home_score, away_score, home_penalties, away_penalties, result_detail, status
+     FROM match_results WHERE match_id = $1 AND mode = 'real'`,
     [matchId]
   );
-  if (!rows.length) return { home: null, away: null, status: null };
+  if (!rows.length) {
+    return {
+      home: null, away: null, homePenalties: null, awayPenalties: null, resultDetail: null, status: null,
+    };
+  }
   return {
     home: rows[0].home_score,
     away: rows[0].away_score,
+    homePenalties: rows[0].home_penalties,
+    awayPenalties: rows[0].away_penalties,
+    resultDetail: rows[0].result_detail,
     status: rows[0].status,
   };
 }
@@ -176,16 +184,23 @@ async function maybeSyncGoals(
   return 0;
 }
 
-async function upsertRealScore(matchId, home, away, status) {
+async function upsertRealScore(matchId, home, away, status, extras = {}) {
+  const { homePenalties, awayPenalties, resultDetail } = extras;
   await query(
-    `INSERT INTO match_results (match_id, mode, home_score, away_score, status, updated_at)
-     VALUES ($1, 'real', $2, $3, $4, NOW())
+    `INSERT INTO match_results (
+       match_id, mode, home_score, away_score, status,
+       home_penalties, away_penalties, result_detail, updated_at
+     )
+     VALUES ($1, 'real', $2, $3, $4, $5, $6, $7, NOW())
      ON CONFLICT (match_id, mode) DO UPDATE SET
        home_score = EXCLUDED.home_score,
        away_score = EXCLUDED.away_score,
        status = EXCLUDED.status,
+       home_penalties = COALESCE(EXCLUDED.home_penalties, match_results.home_penalties),
+       away_penalties = COALESCE(EXCLUDED.away_penalties, match_results.away_penalties),
+       result_detail = COALESCE(EXCLUDED.result_detail, match_results.result_detail),
        updated_at = NOW()`,
-    [matchId, home, away, status]
+    [matchId, home, away, status, homePenalties ?? null, awayPenalties ?? null, resultDetail ?? null]
   );
   if (status === 'finished') {
     recalculatePoolsForMatch(matchId).catch((err) => console.error('Pool ranking recalc:', err.message));
@@ -219,7 +234,18 @@ function parseScorableEvent(ev) {
   const status = mapApiStatus(ev.strStatus);
   if (!status) return null;
 
-  return { home, away, status, apiStatus: ev.strStatus };
+  const resultDetail = mapResultDetail(ev.strStatus);
+  const penalties = parsePenaltiesFromEvent(ev);
+
+  return {
+    home,
+    away,
+    status,
+    apiStatus: ev.strStatus,
+    resultDetail,
+    homePenalties: penalties?.homePenalties ?? null,
+    awayPenalties: penalties?.awayPenalties ?? null,
+  };
 }
 
 export async function runScoreSync() {
@@ -292,11 +318,18 @@ export async function runScoreSync() {
       const matchId = matchRef.id;
       const matchDate = matchRef.date;
 
-      const { home, away, status } = parsed;
+      const {
+        home, away, status, resultDetail, homePenalties, awayPenalties,
+      } = parsed;
       const current = await getCurrentResult(matchId);
 
       const becameFinished = status === 'finished' && current.status !== 'finished';
-      const scoreChanged = current.home !== home || current.away !== away || current.status !== status;
+      const scoreChanged = current.home !== home
+        || current.away !== away
+        || current.status !== status
+        || current.homePenalties !== homePenalties
+        || current.awayPenalties !== awayPenalties
+        || current.resultDetail !== resultDetail;
 
       if (!scoreChanged) {
         if (status === 'finished') {
@@ -309,13 +342,9 @@ export async function runScoreSync() {
         continue;
       }
 
-      const { rows: meta } = await query(`SELECT phase FROM matches WHERE id = $1`, [matchId]);
-      if (status === 'finished' && meta[0]?.phase !== 'group' && home === away) {
-        skipped += 1;
-        continue;
-      }
-
-      await upsertRealScore(matchId, home, away, status);
+      await upsertRealScore(matchId, home, away, status, {
+        homePenalties, awayPenalties, resultDetail,
+      });
       updated += 1;
       if (status === 'live') liveCount += 1;
       console.log(`[sync] ${matchId}: ${home}×${away} [${status}] (${ev.strEvent}, ${parsed.apiStatus})`);

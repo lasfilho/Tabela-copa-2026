@@ -627,6 +627,66 @@ body[data-active-mode="simulation"] #sim-clear-btn:not([hidden]):hover {
   font-weight: 700;
 }
 
+.score-editor__extra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+}
+
+.score-editor__extra select {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.score-editor__extra input[type="number"] {
+  width: 2.2rem;
+  padding: 0.15rem;
+  text-align: center;
+  font-size: 0.72rem;
+}
+
+.score-editor__pen-label {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.score-pen, .score-aet {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.bracket-fixture__pen {
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.score-editor__extra--bracket {
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.score-editor__extra--bracket select,
+.score-editor__extra--bracket input {
+  font-size: 0.62rem;
+}
+
+.bracket-slot__input--pen {
+  width: 1.6rem !important;
+  min-width: 1.6rem;
+  padding: 0 2px !important;
+}
+
 .group-matches {
   border-top: 1px solid var(--border);
   padding: 0.75rem;

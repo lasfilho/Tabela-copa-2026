@@ -5,6 +5,7 @@
  */
 import { flagUrl } from './data-service.js';
 import { getWinner } from './engine.js';
+import { formatMatchScore, isKnockoutPhase, knockoutExtraFieldsHTML } from './match-score.js';
 import { teamFullName, teamShortName } from './team-names.js';
 
 /** SF-1 — semifinal Dallas (M101): vencedores M97 e M98 */
@@ -127,17 +128,26 @@ function renderBracketFixture(data, match, helpers, align = 'left') {
   const projectedClass = match.bracketProjected ? 'bracket-fixture--projected' : '';
 
   const editorOpen = canEditScores
-    ? `<div class="score-editor score-editor--bracket${autoSaveScores ? ' score-editor--autosave' : ''}" data-match-id="${match.id}" data-phase="${match.phase}">`
+    ? `<div class="score-editor score-editor--bracket${autoSaveScores ? ' score-editor--autosave' : ''}" data-match-id="${match.id}" data-phase="${match.phase || ''}">`
     : '<div class="bracket-fixture__body">';
   const editorClose = canEditScores && !autoSaveScores
     ? `<button type="button" class="visually-hidden" data-save-score="${match.id}">Salvar</button></div>`
     : '</div>';
+  const extraReadonly = !canEditScores && match.status === 'finished'
+    && (match.homePenalties != null || match.resultDetail === 'aet' || match.resultDetail === 'pen')
+    ? `<div class="bracket-fixture__pen">${formatMatchScore(match)}</div>`
+    : '';
+  const penEditor = canEditScores && isKnockoutPhase(match.phase)
+    ? knockoutExtraFieldsHTML(match)
+    : '';
 
   return `<div class="bracket-fixture ${alignClass} ${liveClass} ${finishedClass} ${projectedClass}" data-match="${match.id}" title="${match.label || match.id}">
     ${editorOpen}
       ${renderSlot(data, match, 'home', winner, align, canEditScores, match.bracketProjected)}
       ${renderSlot(data, match, 'away', winner, align, canEditScores, match.bracketProjected)}
+      ${penEditor}
     ${editorClose}
+    ${extraReadonly}
   </div>`;
 }
 

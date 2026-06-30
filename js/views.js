@@ -15,6 +15,9 @@ import { renderKnockoutBracket } from './bracket-view.js';
 import { buildPermissions } from './permissions.js';
 import { teamShortLabelHTML } from './team-names.js';
 import { renderTeamLineupInfographic, bindLineupPlayerTooltips } from './team-lineup.js';
+import {
+  isKnockoutPhase, formatMatchScore, readScoreEditor, scoreEditorKey, knockoutExtraFieldsHTML,
+} from './match-score.js';
 
 let onScoreSave = () => {};
 let perms = buildPermissions(null, 'real');
@@ -51,9 +54,7 @@ export function updateModeUI(mode) {
 }
 
 export function scoreDisplayHTML(match) {
-  const hs = match.homeScore ?? '–';
-  const as = match.awayScore ?? '–';
-  return `<span class="score-readonly">${hs} × ${as}</span>`;
+  return `<span class="score-readonly">${formatMatchScore(match)}</span>`;
 }
 
 export function scoreEditorHTML(match, compact = false) {
@@ -61,22 +62,18 @@ export function scoreEditorHTML(match, compact = false) {
   const autoSave = perms.mode === 'simulation';
   const hs = match.homeScore ?? '';
   const as = match.awayScore ?? '';
+  const knockout = isKnockoutPhase(match.phase);
   const actions = autoSave
     ? ''
     : `<button type="button" class="btn btn--primary btn--sm" data-save-score="${match.id}">${compact ? 'OK' : 'Salvar'}</button>`;
   return `
-    <div class="score-editor${autoSave ? ' score-editor--autosave' : ''}" data-match-id="${match.id}">
+    <div class="score-editor${autoSave ? ' score-editor--autosave' : ''}" data-match-id="${match.id}" data-phase="${match.phase || ''}">
       <input type="number" min="0" max="20" inputmode="numeric" data-side="home" value="${hs}" aria-label="Gols mandante" />
       <span class="score-editor__sep">×</span>
       <input type="number" min="0" max="20" inputmode="numeric" data-side="away" value="${as}" aria-label="Gols visitante" />
+      ${knockout ? knockoutExtraFieldsHTML(match, { compact: true }) : ''}
       ${actions}
     </div>`;
-}
-
-function readScoreEditor(wrap) {
-  const home = wrap.querySelector('[data-side="home"]')?.value ?? '';
-  const away = wrap.querySelector('[data-side="away"]')?.value ?? '';
-  return { id: wrap.dataset.matchId, home, away };
 }
 
 export function bindScoreEditors(root, handler, options = {}) {
@@ -86,7 +83,9 @@ export function bindScoreEditors(root, handler, options = {}) {
 
   const commit = (wrap, { quiet = autoSave, force = false } = {}) => {
     if (!wrap?.dataset.matchId) return;
-    const { id, home, away } = readScoreEditor(wrap);
+    const {
+      id, home, away, homePenalties, awayPenalties, resultDetail,
+    } = readScoreEditor(wrap);
     const homeEmpty = home === '';
     const awayEmpty = away === '';
 
@@ -99,10 +98,12 @@ export function bindScoreEditors(root, handler, options = {}) {
       return;
     }
 
-    const key = `${home}|${away}`;
+    const key = scoreEditorKey({ home, away, homePenalties, awayPenalties, resultDetail });
     if (!force && lastSaved.get(id) === key) return;
 
-    Promise.resolve(handler(id, home, away, { quiet }))
+    Promise.resolve(handler(id, home, away, {
+      quiet, homePenalties, awayPenalties, resultDetail,
+    }))
       .then(() => lastSaved.set(id, key))
       .catch(() => {});
   };
@@ -116,13 +117,15 @@ export function bindScoreEditors(root, handler, options = {}) {
   }
 
   root.querySelectorAll('.score-editor').forEach((wrap) => {
-    const inputs = wrap.querySelectorAll('input[data-side]');
+    const inputs = wrap.querySelectorAll('input[data-side], select[data-result-detail]');
     if (!inputs.length) return;
 
     if (autoSave) {
-      const { id, home, away } = readScoreEditor(wrap);
+      const {
+        id, home, away, homePenalties, awayPenalties, resultDetail,
+      } = readScoreEditor(wrap);
       if (id && home !== '' && away !== '') {
-        lastSaved.set(id, `${home}|${away}`);
+        lastSaved.set(id, scoreEditorKey({ home, away, homePenalties, awayPenalties, resultDetail }));
       }
     }
 

@@ -46,6 +46,9 @@ export async function fetchBootstrap(mode = 'real') {
 export async function saveMatchScore(mode, matchId, homeScore, awayScore, options = {}) {
   const body = { mode, homeScore, awayScore };
   if (options.finish) body.finish = true;
+  if (options.homePenalties !== undefined) body.homePenalties = options.homePenalties;
+  if (options.awayPenalties !== undefined) body.awayPenalties = options.awayPenalties;
+  if (options.resultDetail) body.resultDetail = options.resultDetail;
   return request(`/matches/${matchId}/score`, {
     method: 'PUT',
     body: JSON.stringify(body),

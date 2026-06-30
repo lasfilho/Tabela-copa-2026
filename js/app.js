@@ -367,7 +367,12 @@ async function fillGroupTestScores() {
 }
 
 async function persistMatchScore(matchId, homeRaw, awayRaw, options = {}) {
-  const { quiet = false } = options;
+  const {
+    quiet = false,
+    homePenalties,
+    awayPenalties,
+    resultDetail,
+  } = options;
   if (!state.permissions.canEditScores) {
     if (!quiet) showToast('Somente leitura neste modo');
     return;
@@ -378,7 +383,11 @@ async function persistMatchScore(matchId, homeRaw, awayRaw, options = {}) {
   }
 
   try {
-    await saveMatchScore(state.mode, matchId, homeRaw, awayRaw);
+    await saveMatchScore(state.mode, matchId, homeRaw, awayRaw, {
+      homePenalties: homePenalties === '' ? null : homePenalties,
+      awayPenalties: awayPenalties === '' ? null : awayPenalties,
+      resultDetail: resultDetail || null,
+    });
     await reloadData();
     renderAll();
     if (!quiet) {

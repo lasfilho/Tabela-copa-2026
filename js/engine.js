@@ -328,6 +328,10 @@ export function getNextMatch(matches, today = todayDateString()) {
 
 export function getWinner(match) {
   if (match.status !== 'finished') return null;
+  if (match.homePenalties != null && match.awayPenalties != null) {
+    if (match.homePenalties > match.awayPenalties) return match.home;
+    if (match.awayPenalties > match.homePenalties) return match.away;
+  }
   if (match.homeScore > match.awayScore) return match.home;
   if (match.awayScore > match.homeScore) return match.away;
   return null;

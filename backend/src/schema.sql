@@ -54,12 +54,19 @@ CREATE TABLE IF NOT EXISTS match_results (
   mode match_mode NOT NULL,
   home_score SMALLINT,
   away_score SMALLINT,
+  home_penalties SMALLINT,
+  away_penalties SMALLINT,
+  result_detail VARCHAR(8),
   status match_status NOT NULL DEFAULT 'scheduled',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (match_id, mode),
   CHECK (home_score IS NULL OR home_score >= 0),
   CHECK (away_score IS NULL OR away_score >= 0)
 );
+
+ALTER TABLE match_results ADD COLUMN IF NOT EXISTS home_penalties SMALLINT;
+ALTER TABLE match_results ADD COLUMN IF NOT EXISTS away_penalties SMALLINT;
+ALTER TABLE match_results ADD COLUMN IF NOT EXISTS result_detail VARCHAR(8);
 
 CREATE TABLE IF NOT EXISTS app_preferences (
   id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
