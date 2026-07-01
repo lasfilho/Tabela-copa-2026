@@ -8,7 +8,7 @@ import {
   fetchMyInvites, respondToInvite, fetchPoolCreators, fetchPoolsByCreator,
   POOL_DISCLAIMER, statusLabel, visibilityLabel, inviteStatusLabel, formatDate, formatDateShort,
 } from './pool-client.js?v=23';
-import { esc, matchTeamsHTML } from './pool-match-display.js?v=22';
+import { esc, matchTeamsHTML, setPoolBracketSource } from './pool-match-display.js?v=23';
 
 const state = {
   screen: 'list',
@@ -27,6 +27,8 @@ const state = {
 };
 
 let teamMap = {};
+let tournamentMatches = [];
+let tournamentGroups = [];
 let currentUser = null;
 let showToastFn = () => {};
 let poolContainer = null;
@@ -38,10 +40,18 @@ function matchWhenHTML(row) {
   return `<span class="pool-pred-row__when">${esc(`${date}${time ? ` ${time}` : ''}`)}</span>`;
 }
 
+function syncBracketSource() {
+  setPoolBracketSource(tournamentMatches, tournamentGroups, teamMap);
+}
+
 function matchMetaHTML(row) {
   const parts = [];
   if (row.group) parts.push(`Grupo ${row.group}`);
-  if (row.phase && row.phase !== 'group') parts.push(row.phase.toUpperCase());
+  if (row.phase && row.phase !== 'group') {
+    const phaseLabels = { r32: '16 avos', r16: 'Oitavas', qf: 'Quartas', sf: 'Semifinal', bronze: '3º lugar', final: 'Final' };
+    parts.push(phaseLabels[row.phase] ?? row.phase.toUpperCase());
+  }
+  if (row.bracketProjected) parts.push('provisório');
   const date = formatDateShort(row.date ?? row.match_date);
   const time = row.time ?? row.match_time?.slice?.(0, 5) ?? '';
   if (date !== '—') parts.push(`${date}${time ? ` ${time}` : ''}`);
@@ -263,6 +273,7 @@ async function renderCreate(container) {
 
   if (gen !== createRenderGen) return;
 
+  syncBracketSource();
   const creatorName = meta.creator?.name ?? currentUser?.name ?? '—';
   const matches = state.matchesMeta;
 
@@ -500,6 +511,7 @@ async function renderSettings(container, pool, isCreator) {
 
 async function renderPredictions(container) {
   container.innerHTML = '<div class="pool-loading">Carregando palpites...</div>';
+  syncBracketSource();
   try {
     const data = await fetchPoolPredictions(state.poolId);
     const items = data.items ?? [];
@@ -766,8 +778,11 @@ async function renderPublicLink(container) {
 
 export function updatePoolContext(opts = {}) {
   teamMap = opts.teamMap ?? teamMap;
+  tournamentMatches = opts.matches ?? tournamentMatches;
+  tournamentGroups = opts.groups ?? tournamentGroups;
   currentUser = opts.currentUser ?? currentUser;
   showToastFn = opts.showToast ?? showToastFn;
+  syncBracketSource();
 }
 
 export async function renderPoolApp(container, opts = {}) {
@@ -785,7 +800,10 @@ export async function renderPoolApp(container, opts = {}) {
 export function initPoolUI(container, opts = {}) {
   showToastFn = opts.showToast ?? (() => {});
   teamMap = opts.teamMap ?? {};
+  tournamentMatches = opts.matches ?? [];
+  tournamentGroups = opts.groups ?? [];
   currentUser = opts.currentUser ?? null;
+  syncBracketSource();
   poolContainer = container;
 
   document.getElementById('pool-participant-modal-close')?.addEventListener('click', () => {

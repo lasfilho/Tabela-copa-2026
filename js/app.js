@@ -21,7 +21,7 @@ import {
   openScoreModal, setPermissions,
 } from './views.js';
 import { renderTeamDetailCharts, destroyTeamCharts } from './team-charts.js';
-import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=25';
+import { renderPoolApp, initPoolUI, resetPoolUI, updatePoolContext } from './pool-ui.js?v=26';
 import { initStickers, renderStickers, setStickersUser } from './stickers-ui.js?v=2';
 import { renderAdminSettings, initAdminSettingsUI } from './admin-settings.js';
 import { initAudit, renderAudit } from './audit-ui.js?v=1';
@@ -247,14 +247,20 @@ function applyTheme() {
 let poolUIReady = false;
 let adminUIReady = false;
 
+function poolContextPayload() {
+  return {
+    teamMap: data?.teamMap ?? {},
+    matches: data?.matches ?? [],
+    groups: data?.groups ?? [],
+    showToast,
+    currentUser: state.user,
+  };
+}
+
 function ensurePoolUI() {
   const container = document.getElementById('pool-content');
   if (!container || poolUIReady) return;
-  initPoolUI(container, {
-    teamMap: data?.teamMap ?? {},
-    showToast,
-    currentUser: state.user,
-  });
+  initPoolUI(container, poolContextPayload());
   poolUIReady = true;
 }
 
@@ -268,11 +274,7 @@ async function showPoolView() {
   const pool = document.getElementById('view-pool');
   pool.hidden = false;
   pool.classList.add('active');
-  await renderPoolApp(document.getElementById('pool-content'), {
-    teamMap: data?.teamMap ?? {},
-    showToast,
-    currentUser: state.user,
-  });
+  await renderPoolApp(document.getElementById('pool-content'), poolContextPayload());
 }
 async function setMode(mode) {
   if ((mode === 'simulation' || mode === 'pool') && !state.permissions.canAccessSimulation) {
@@ -652,7 +654,7 @@ async function refreshSyncStatus(reloadIfUpdated = false) {
         && (status.lastUpdated > 0 || status.lastGoalsSynced > 0)) {
       await reloadData();
       if (state.mode === 'pool') {
-        updatePoolContext({ teamMap: data?.teamMap ?? {}, showToast, currentUser: state.user });
+        updatePoolContext(poolContextPayload());
       } else {
         renderAll();
       }
@@ -708,7 +710,7 @@ function initScoreSync() {
       if (next && status.lastUpdated > 0) {
         await reloadData();
         if (state.mode === 'pool') {
-          updatePoolContext({ teamMap: data?.teamMap ?? {}, showToast, currentUser: state.user });
+          updatePoolContext(poolContextPayload());
         } else {
           renderAll();
         }
@@ -745,7 +747,7 @@ async function runManualScoreSync() {
     if (result.updated > 0 || result.goalsSynced > 0) {
       await reloadData();
       if (state.mode === 'pool') {
-        updatePoolContext({ teamMap: data?.teamMap ?? {}, showToast, currentUser: state.user });
+        updatePoolContext(poolContextPayload());
       } else {
         renderAll();
       }
@@ -860,11 +862,7 @@ function renderAll() {
   if (!data) return;
   if (state.mode === 'pool') {
     updateStatusBarVisibility();
-    updatePoolContext({
-      teamMap: data.teamMap ?? {},
-      showToast,
-      currentUser: state.user,
-    });
+    updatePoolContext(poolContextPayload());
     return;
   }
 
